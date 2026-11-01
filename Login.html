@@ -35,12 +35,12 @@ tailwind.config = { theme: { extend: {
     </div>
     <h1 id="lTitle" class="text-xl font-extrabold text-navy-900 text-center">Masuk ke Inventori K3</h1>
     <p id="lDesc" class="text-sm text-slate-500 text-center mt-1 mb-6">Gunakan akun yang diberikan administrator.</p>
-    <form id="lf" class="space-y-4">
+    <form id="loginForm" class="space-y-4">
       <label id="nameRow" class="lbl hidden">Nama lengkap<input id="name" maxlength="60" class="inp" autocomplete="name"></label>
-      <label class="lbl">Email<input id="email" type="email" required class="inp" autocomplete="email"></label>
-      <label class="lbl">Kata sandi<input id="pass" type="password" required class="inp" autocomplete="current-password"></label>
+      <label class="lbl">Username<input id="username" type="text" required class="inp" autocomplete="username"></label>
+      <label class="lbl">Kata sandi<input id="password" type="password" required class="inp" autocomplete="current-password"></label>
       <label id="pass2Row" class="lbl hidden">Ulangi kata sandi<input id="pass2" type="password" class="inp" autocomplete="new-password"></label>
-      <p id="err" class="text-sm text-red-600 min-h-[1.25rem]" role="alert"></p>
+      <p id="loginMessage" class="text-sm text-red-600 min-h-[1.25rem]" role="alert"></p>
       <button id="lBtn" type="submit" class="w-full rounded-xl bg-sun px-5 py-3 text-sm font-bold text-navy-900 hover:bg-yellow-300 transition focus:outline-none focus-visible:ring-4 focus-visible:ring-sun/50 disabled:opacity-60">Masuk</button>
     </form>
   </div>
