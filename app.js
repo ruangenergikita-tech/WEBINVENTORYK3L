@@ -590,7 +590,7 @@ layout(); render();
 
 /* =====================================================================
    5. PENJALAN HALAMAN
-   Setiap halaman HTML memiliki atribut <body data-page="...">.
+   
    ===================================================================== */
 function start(DB) {
   const pages = { login: initLogin, dashboard: initDashboard, data: initData, tambah: initTambah };
