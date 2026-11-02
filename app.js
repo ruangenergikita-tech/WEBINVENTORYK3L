@@ -29,13 +29,15 @@ const fmt=d=>d?new Date(d+'T00:00:00').toLocaleDateString('id-ID',{day:'numeric'
 const TONE={ok:'bg-emerald-50 text-emerald-700 ring-emerald-600/20',warn:'bg-amber-50 text-amber-800 ring-amber-600/25',bad:'bg-red-50 text-red-700 ring-red-600/20'};
 const pill=s=>`<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${TONE[s[1]]}">${esc(s[0])}</span>`;
 function p3kStatus(i){
-  const d=i.exp?daysLeft(i.exp):null;
-  if(d!==null&&d<0)return['Kedaluwarsa '+(-d)+' hari lalu','bad'];
+  const d=i.exp?daysLeft(i.exp):null, lay=i.tipeTgl==='kelayakan';
+  if(d!==null&&d<0)return[(lay?'Masa layak habis ':'Kedaluwarsa ')+(-d)+' hari lalu','bad'];
   if(i.qty===0)return['Stok habis','bad'];
-  if(d!==null&&d<=30)return['Kedaluwarsa dalam '+d+' hari','warn'];
+  if(d!==null&&d<=30)return[(lay?'Masa layak habis dalam ':'Kedaluwarsa dalam ')+d+' hari','warn'];
   if(i.qty<=i.min)return['Stok menipis ('+i.qty+' dari min. '+i.min+')','warn'];
   return['Aman','ok'];
 }
+// Tanggal + keterangan jenisnya (kedaluwarsa / kelayakan)
+const tgl=i=>i.exp?fmt(i.exp)+`<div class="text-xs text-slate-400">${i.tipeTgl==='kelayakan'?'Batas kelayakan':'Kedaluwarsa'}</div>`:'-';
 function aparStatus(i){
   const d=daysLeft(i.exp);
   if(d<0)return['Isi ulang terlambat '+(-d)+' hari','bad'];
@@ -383,7 +385,7 @@ function render() {
     <td class="px-5 py-3 font-semibold text-slate-900">${esc(i.name)}</td>
     <td class="px-3 py-3 text-slate-600">${esc(i.lokasi)}</td>
     <td class="px-3 py-3 text-center"><b>${i.qty}</b> <span class="text-xs text-slate-400">min. ${i.min}</span></td>
-    <td class="px-3 py-3 text-slate-600">${fmt(i.exp)}</td>
+    <td class="px-3 py-3 text-slate-600">${tgl(i)}</td>
     <td class="px-3 py-3">${pill(s)}</td></tr>`).join('') : empty(5, sp.length, loaded.p);
 
   $('rowsApar').innerHTML = la.length ? la.map(([i, s]) => `<tr class="hover:bg-slate-50/70">
@@ -400,7 +402,7 @@ function render() {
     <td class="px-3 py-3 text-slate-600">${esc(i.lokasi)}</td>
     <td class="px-3 py-3 text-slate-600">${esc([i.ukuran ? 'Ukuran ' + i.ukuran : '', i.ket].filter(Boolean).join(', ') || '-')}</td>
     <td class="px-3 py-3 text-center"><b>${i.qty}</b> <span class="text-xs text-slate-400">min. ${i.min}</span></td>
-    <td class="px-3 py-3 text-slate-600">${fmt(i.exp)}</td>
+    <td class="px-3 py-3 text-slate-600">${tgl(i)}</td>
     <td class="px-3 py-3">${pill(s)}</td></tr>`).join('') : empty(7, sb.length, loaded.b);
 }
 
@@ -409,9 +411,10 @@ $('print').onclick = () => window.print();
 $('csv').onclick = () => {
   const { lp, la, lb } = view();
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-  const rows = lp.map(([i, s]) => ['P3K', i.name, i.lokasi, 'Stok ' + i.qty + ', minimum ' + i.min, i.exp || '', s[0]])
+  const tg = i => i.exp ? (i.tipeTgl === 'kelayakan' ? 'Kelayakan ' : 'Kedaluwarsa ') + i.exp : '';
+  const rows = lp.map(([i, s]) => ['P3K', i.name, i.lokasi, 'Stok ' + i.qty + ', minimum ' + i.min, tg(i), s[0]])
     .concat(la.map(([i, s]) => ['APAR', i.kode, i.lokasi, i.jenis + ', ' + i.berat + ' kg, tekanan ' + i.tekanan, i.exp || '', s[0]]))
-    .concat(lb.map(([i, s]) => [i.kategori || 'Lainnya', i.name, i.lokasi, [i.ukuran ? 'Ukuran ' + i.ukuran : '', i.ket, 'Stok ' + i.qty + ', minimum ' + i.min].filter(Boolean).join(', '), i.exp || '', s[0]]));
+    .concat(lb.map(([i, s]) => [i.kategori || 'Lainnya', i.name, i.lokasi, [i.ukuran ? 'Ukuran ' + i.ukuran : '', i.ket, 'Stok ' + i.qty + ', minimum ' + i.min].filter(Boolean).join(', '), tg(i), s[0]]));
   const csv = [['Kategori', 'Nama atau kode', 'Lokasi', 'Detail', 'Jatuh tempo', 'Status']].concat(rows).map(r => r.map(q).join(',')).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' }));
@@ -450,9 +453,12 @@ function layout() {
   show('wUkuran', isG); show('wKet', isG);
   ['wBerat', 'wJenis', 'wTekanan', 'wInsp'].forEach(id => show(id, isA));
   $('berat').required = isA; $('exp').required = isA;
-  $('expLbl').textContent = isA ? 'Jadwal isi ulang' : 'Tanggal kedaluwarsa atau jatuh tempo (opsional)';
+  show('wTipeTgl', !isA);
+  const lay = $('tipeTgl').value === 'kelayakan';
+  $('expLbl').textContent = isA ? 'Jadwal isi ulang' : (lay ? 'Batas kelayakan (opsional)' : 'Tanggal kedaluwarsa (opsional)');
 }
 $('kat').onchange = layout;
+$('tipeTgl').onchange = layout;
 
 function resetForm() {
   const k = $('kat').value, c = $('katCustom').value;   // pertahankan kategori agar mudah input beruntun
@@ -470,7 +476,7 @@ $('f').onsubmit = e => {
   let d;
   if (kind === 'apar') d = { kode: nama, lokasi, jenis: $('jenis').value, berat: +$('berat').value || 0, tekanan: $('tekanan').value, exp, insp: $('insp').value };
   else {
-    d = { name: nama, lokasi, qty: Math.max(0, +$('qty').value || 0), min: Math.max(0, +$('min').value || 0), exp };
+    d = { name: nama, lokasi, qty: Math.max(0, +$('qty').value || 0), min: Math.max(0, +$('min').value || 0), exp, tipeTgl: $('tipeTgl').value };
     if (kind === 'barang') {
       d.kategori = $('kat').value === 'Custom' ? $('katCustom').value.trim() : $('kat').value;
       d.ukuran = $('ukuran').value.trim(); d.ket = $('ket').value.trim();
@@ -506,7 +512,7 @@ function render() {
     <td class="px-3 py-3 text-slate-600">${esc(i.lokasi)}</td>
     <td class="px-3 py-3 text-slate-600">${esc(detail)}</td>
     <td class="px-3 py-3 text-center">${isA ? '<span class="text-slate-400">-</span>' : `<div class="inline-flex items-center rounded-full bg-slate-100 p-0.5">${ctl(x, 'dec', 'Kurangi stok')}<b class="w-9 text-center">${i.qty}</b>${ctl(x, 'inc', 'Tambah stok')}</div>`}</td>
-    <td class="px-3 py-3 text-slate-700">${fmt(i.exp)}${isA ? `<div class="text-xs text-slate-400">Inspeksi: ${fmt(i.insp)}</div>` : ''}</td>
+    <td class="px-3 py-3 text-slate-700">${isA ? fmt(i.exp) : tgl(i)}${isA ? `<div class="text-xs text-slate-400">Inspeksi: ${fmt(i.insp)}</div>` : ''}</td>
     <td class="px-3 py-3">${pill(x.s)}</td>
     <td class="px-5 py-3 text-right whitespace-nowrap">
       <button data-a="edit" data-c="${x.c}" data-id="${i.id}" class="rounded-lg px-3 py-1.5 text-sm font-semibold text-pln hover:bg-sky-50">Ubah</button>
@@ -531,7 +537,7 @@ $('rows').onclick = e => {
     $('kat').disabled = true; layout();
     $('nama').value = it.name || it.kode || ''; $('lokasi').value = it.lokasi || ''; $('exp').value = it.exp || '';
     if (c === 'apar') { $('jenis').value = it.jenis; $('berat').value = it.berat; $('tekanan').value = it.tekanan; $('insp').value = it.insp || ''; }
-    else { $('qty').value = it.qty; $('min').value = it.min; }
+    else { $('qty').value = it.qty; $('min').value = it.min; $('tipeTgl').value = it.tipeTgl || 'kedaluwarsa'; layout(); }
     if (c === 'barang') { $('ukuran').value = it.ukuran || ''; $('ket').value = it.ket || ''; }
     $('title').textContent = 'Ubah data'; $('save').textContent = 'Simpan perubahan'; $('cancel').classList.remove('hidden');
     $('nama').focus(); window.scrollTo({ top: 0, behavior: 'smooth' });
