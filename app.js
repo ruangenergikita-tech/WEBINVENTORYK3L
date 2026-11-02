@@ -180,8 +180,8 @@ function breakdown(title,href,sts){
 
 let p3k=[],apar=[],got={p:0,a:0};
 function render(){
-  const sp=p3k.map(i=>({t:'P3K',href:'data.html',n:i.name,l:i.lokasi,s:p3kStatus(i),exp:i.exp}));
-  const sa=apar.map(i=>({t:'APAR',href:'data.html',n:i.kode,l:i.lokasi,s:aparStatus(i),exp:i.exp}));
+  const sp=p3k.map(i=>({t:'P3K',href:'Data.html',n:i.name,l:i.lokasi,s:p3kStatus(i),exp:i.exp}));
+  const sa=apar.map(i=>({t:'APAR',href:'Data.html',n:i.kode,l:i.lokasi,s:aparStatus(i),exp:i.exp}));
   const all=sp.concat(sa),bad=all.filter(x=>x.s[1]!=='ok');
   $('demoBox').classList.toggle('hidden',!(got.p&&got.a)||all.length>0);
 
@@ -199,7 +199,7 @@ function render(){
     <h2 class="font-bold text-navy-900 mb-3 self-start">Tingkat kesiapan</h2>
     <div class="relative"><svg viewBox="0 0 120 120" class="h-40 w-40 -rotate-90"><circle cx="60" cy="60" r="52" fill="none" stroke="#E2E8F0" stroke-width="12"/><circle cx="60" cy="60" r="52" fill="none" stroke="${col}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${pct===null?0:C*pct/100} ${C}"/></svg>
     <div class="absolute inset-0 flex flex-col items-center justify-center"><span class="text-3xl font-extrabold text-navy-900">${pct===null?'-':pct+'%'}</span><span class="text-xs text-slate-500">item dalam kondisi aman</span></div></div></div>`;
-  $('stats').innerHTML=ring+breakdown('Status P3K','tambah.html?jenis=p3k',sp.map(x=>x.s))+breakdown('Status APAR','tambah.html?jenis=apar',sa.map(x=>x.s));
+  $('stats').innerHTML=ring+breakdown('Status P3K','Tambah.html?jenis=p3k',sp.map(x=>x.s))+breakdown('Status APAR','Tambah.html?jenis=apar',sa.map(x=>x.s));
 
   const up=all.filter(x=>x.exp&&daysLeft(x.exp)>=0&&daysLeft(x.exp)<=90).sort((a,b)=>a.exp.localeCompare(b.exp)).slice(0,7);
   $('timeline').innerHTML=up.length?up.map(x=>{const d=new Date(x.exp+'T00:00:00'),n=daysLeft(x.exp);
@@ -340,36 +340,44 @@ render();
 }
 
 
-// ---- data.html (laporan, hanya baca) ----
+// ---- Data.html (laporan, hanya baca) ----
 function initData(DB) {
 const byNew = (a, b) => (b.created || 0) - (a.created || 0);
-let p3k = [], apar = [], loaded = { p: false, a: false };
+const FIXED = ['Baju', 'Sepatu'];
+let p3k = [], apar = [], brg = [], loaded = { p: false, a: false, b: false };
 $('todayTxt').textContent = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 DB.watch('p3k', l => { p3k = l.sort(byNew); loaded.p = true; render(); });
 DB.watch('apar', l => { apar = l.sort(byNew); loaded.a = true; render(); });
+DB.watch('barang', l => { brg = l.sort(byNew); loaded.b = true; render(); });
+
+const brgMatch = (i, t) => t === 'all' || (t === 'Lainnya' ? !FIXED.includes(i.kategori) : i.kategori === t);
 
 // Data setelah pencarian dan filter diterapkan
 function view() {
   const q = $('q').value.trim().toLowerCase(), f = $('flt').value, t = $('tipe').value;
-  const sp = p3k.map(i => [i, p3kStatus(i)]), sa = apar.map(i => [i, aparStatus(i)]);
-  const lp = t === 'apar' ? [] : sp.filter(([i, s]) => (!q || (i.name + ' ' + i.lokasi).toLowerCase().includes(q)) && matchFilter(s, f));
-  const la = t === 'p3k' ? [] : sa.filter(([i, s]) => (!q || (i.kode + ' ' + i.lokasi).toLowerCase().includes(q)) && matchFilter(s, f));
-  return { sp, sa, lp, la, t };
+  const sp = p3k.map(i => [i, p3kStatus(i)]), sa = apar.map(i => [i, aparStatus(i)]), sb = brg.map(i => [i, p3kStatus(i)]);
+  const lp = (t === 'all' || t === 'P3K') ? sp.filter(([i, s]) => (!q || (i.name + ' ' + i.lokasi).toLowerCase().includes(q)) && matchFilter(s, f)) : [];
+  const la = (t === 'all' || t === 'APAR') ? sa.filter(([i, s]) => (!q || (i.kode + ' ' + i.lokasi).toLowerCase().includes(q)) && matchFilter(s, f)) : [];
+  const lb = sb.filter(([i, s]) => brgMatch(i, t) && (!q || ((i.kategori || '') + ' ' + i.name + ' ' + i.lokasi + ' ' + (i.ukuran || '') + ' ' + (i.ket || '')).toLowerCase().includes(q)) && matchFilter(s, f));
+  return { sp, sa, sb, lp, la, lb, t };
 }
 const empty = (cols, total, ready) => `<tr><td colspan="${cols}" class="px-5 py-12 text-center text-slate-500">${!ready ? 'Memuat data...' : total ? 'Tidak ada data yang cocok dengan pencarian atau filter.' : 'Belum ada data. Tambahkan lewat halaman Tambah.'}</td></tr>`;
 
 function render() {
-  const { sp, sa, lp, la, t } = view();
-  const all = sp.concat(sa);
+  const { sp, sa, sb, lp, la, lb, t } = view();
+  const all = sp.concat(sa, sb);
   $('sP3k').textContent = sp.length;
   $('sApar').textContent = sa.length;
+  $('sBrg').textContent = sb.length;
   $('sAlert').textContent = all.filter(x => x[1][1] !== 'ok').length;
   $('sOk').textContent = all.filter(x => x[1][1] === 'ok').length;
 
-  $('secP3k').classList.toggle('hidden', t === 'apar');
-  $('secApar').classList.toggle('hidden', t === 'p3k');
+  $('secP3k').classList.toggle('hidden', !(t === 'all' || t === 'P3K'));
+  $('secApar').classList.toggle('hidden', !(t === 'all' || t === 'APAR'));
+  $('secBrg').classList.toggle('hidden', t === 'P3K' || t === 'APAR');
   $('cP3k').textContent = lp.length + ' dari ' + sp.length + ' item';
   $('cApar').textContent = la.length + ' dari ' + sa.length + ' unit';
+  $('cBrg').textContent = lb.length + ' dari ' + sb.length + ' item';
 
   $('rowsP3k').innerHTML = lp.length ? lp.map(([i, s]) => `<tr class="hover:bg-slate-50/70">
     <td class="px-5 py-3 font-semibold text-slate-900">${esc(i.name)}</td>
@@ -385,18 +393,28 @@ function render() {
     <td class="px-3 py-3 text-slate-600">${esc(i.tekanan)}</td>
     <td class="px-3 py-3 text-slate-700">${fmt(i.exp)}<div class="text-xs text-slate-400">Inspeksi: ${fmt(i.insp)}</div></td>
     <td class="px-3 py-3">${pill(s)}</td></tr>`).join('') : empty(6, sa.length, loaded.a);
+
+  $('rowsBrg').innerHTML = lb.length ? lb.map(([i, s]) => `<tr class="hover:bg-slate-50/70">
+    <td class="px-5 py-3"><span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">${esc(i.kategori || 'Lainnya')}</span></td>
+    <td class="px-3 py-3 font-semibold text-slate-900">${esc(i.name)}</td>
+    <td class="px-3 py-3 text-slate-600">${esc(i.lokasi)}</td>
+    <td class="px-3 py-3 text-slate-600">${esc([i.ukuran ? 'Ukuran ' + i.ukuran : '', i.ket].filter(Boolean).join(', ') || '-')}</td>
+    <td class="px-3 py-3 text-center"><b>${i.qty}</b> <span class="text-xs text-slate-400">min. ${i.min}</span></td>
+    <td class="px-3 py-3 text-slate-600">${fmt(i.exp)}</td>
+    <td class="px-3 py-3">${pill(s)}</td></tr>`).join('') : empty(7, sb.length, loaded.b);
 }
 
 $('q').oninput = render; $('flt').onchange = render; $('tipe').onchange = render;
 $('print').onclick = () => window.print();
 $('csv').onclick = () => {
-  const { lp, la } = view();
+  const { lp, la, lb } = view();
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
   const rows = lp.map(([i, s]) => ['P3K', i.name, i.lokasi, 'Stok ' + i.qty + ', minimum ' + i.min, i.exp || '', s[0]])
-    .concat(la.map(([i, s]) => ['APAR', i.kode, i.lokasi, i.jenis + ', ' + i.berat + ' kg, tekanan ' + i.tekanan, i.exp || '', s[0]]));
-  const csv = [['Jenis', 'Nama atau kode', 'Lokasi', 'Detail', 'Jatuh tempo', 'Status']].concat(rows).map(r => r.map(q).join(',')).join('\n');
+    .concat(la.map(([i, s]) => ['APAR', i.kode, i.lokasi, i.jenis + ', ' + i.berat + ' kg, tekanan ' + i.tekanan, i.exp || '', s[0]]))
+    .concat(lb.map(([i, s]) => [i.kategori || 'Lainnya', i.name, i.lokasi, [i.ukuran ? 'Ukuran ' + i.ukuran : '', i.ket, 'Stok ' + i.qty + ', minimum ' + i.min].filter(Boolean).join(', '), i.exp || '', s[0]]));
+  const csv = [['Kategori', 'Nama atau kode', 'Lokasi', 'Detail', 'Jatuh tempo', 'Status']].concat(rows).map(r => r.map(q).join(',')).join('\n');
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv' }));
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' }));
   a.download = 'laporan-k3.csv'; a.click();
 };
 render();
@@ -404,105 +422,127 @@ render();
 }
 
 
-// ---- tambah.html (input dan CRUD P3K dan APAR) ----
+// ---- Tambah.html (satu formulir untuk semua kategori + CRUD) ----
 function initTambah(DB) {
 const byNew = (a, b) => (b.created || 0) - (a.created || 0);
 const fail = e => alert(DB.err(e));
-let p3k = [], apar = [], ready = { p: false, a: false };
-const flash = (id, t) => { const el = $(id); el.textContent = t; clearTimeout(el._t); el._t = setTimeout(() => { el.textContent = ''; }, 3000); };
-const hero = () => heroStats(p3k.map(p3kStatus).concat(apar.map(aparStatus)));
+const FIXED = ['Baju', 'Sepatu'];
+let p3k = [], apar = [], brg = [], ready = { p: false, a: false, b: false };
+const flash = t => { const el = $('msg'); el.textContent = t; clearTimeout(el._t); el._t = setTimeout(() => { el.textContent = ''; }, 3000); };
 
-DB.watch('p3k', l => { p3k = l.sort(byNew); ready.p = true; renderP(); });
-DB.watch('apar', l => { apar = l.sort(byNew); ready.a = true; renderA(); });
+DB.watch('p3k', l => { p3k = l.sort(byNew); ready.p = true; render(); });
+DB.watch('apar', l => { apar = l.sort(byNew); ready.a = true; render(); });
+DB.watch('barang', l => { brg = l.sort(byNew); ready.b = true; render(); });
 
-// ---- Tab P3K dan APAR ----
-function setTab(t) {
-  const isP = t !== 'apar';
-  $('panP3k').classList.toggle('hidden', !isP);
-  $('panApar').classList.toggle('hidden', isP);
-  const on = 'bg-navy-900 text-white', off = 'bg-white text-slate-600 hover:bg-slate-100 ring-1 ring-slate-200';
-  $('tabP3k').className = 'rounded-full px-5 py-2.5 text-sm font-semibold transition ' + (isP ? on : off);
-  $('tabApar').className = 'rounded-full px-5 py-2.5 text-sm font-semibold transition ' + (isP ? off : on);
-  try { history.replaceState(null, '', '?jenis=' + (isP ? 'p3k' : 'apar')); } catch (e) { /* abaikan */ }
+// ---- Isian formulir menyesuaikan kategori ----
+const PH = { P3K: ['Nama item', 'Contoh: Plester luka', 'Lokasi kotak P3K', 'Contoh: Lobi lantai 1'],
+  APAR: ['Kode APAR', 'Contoh: APAR-001', 'Lokasi', 'Contoh: Gudang pintu timur'],
+  Baju: ['Nama baju', 'Contoh: Coverall oranye', 'Lokasi penyimpanan', 'Contoh: Gudang K3'],
+  Sepatu: ['Nama sepatu', 'Contoh: Safety shoes', 'Lokasi penyimpanan', 'Contoh: Gudang K3'],
+  Custom: ['Nama item', 'Contoh: Helm proyek', 'Lokasi penyimpanan', 'Contoh: Gudang K3'] };
+const show = (id, on) => $(id).classList.toggle('hidden', !on);
+function layout() {
+  const k = $('kat').value, isA = k === 'APAR', isG = !isA && k !== 'P3K';
+  const p = PH[k];
+  $('namaLbl').textContent = p[0]; $('nama').placeholder = p[1]; $('lokasiLbl').textContent = p[2]; $('lokasi').placeholder = p[3];
+  show('wCustom', k === 'Custom'); $('katCustom').required = k === 'Custom';
+  show('wQty', !isA); show('wMin', !isA);
+  show('wUkuran', isG); show('wKet', isG);
+  ['wBerat', 'wJenis', 'wTekanan', 'wInsp'].forEach(id => show(id, isA));
+  $('berat').required = isA; $('exp').required = isA;
+  $('expLbl').textContent = isA ? 'Jadwal isi ulang' : 'Tanggal kedaluwarsa atau jatuh tempo (opsional)';
 }
-$('tabP3k').onclick = () => setTab('p3k');
-$('tabApar').onclick = () => setTab('apar');
-setTab(new URLSearchParams(location.search).get('jenis'));
+$('kat').onchange = layout;
 
-// ---- P3K ----
-function renderP() {
-  const q = $('pQ').value.trim().toLowerCase();
-  const list = p3k.filter(i => !q || (i.name + ' ' + i.lokasi).toLowerCase().includes(q));
-  $('pRows').innerHTML = list.length ? list.map(i => `<tr class="hover:bg-slate-50/70">
-    <td class="px-5 py-3 font-semibold text-slate-900">${esc(i.name)}</td>
-    <td class="px-3 py-3 text-slate-600">${esc(i.lokasi)}</td>
-    <td class="px-3 py-3"><div class="mx-auto inline-flex items-center rounded-full bg-slate-100 p-0.5 w-fit">
-      <button data-a="dec" data-id="${i.id}" aria-label="Kurangi stok" class="h-7 w-7 rounded-full text-slate-600 hover:bg-white hover:shadow-sm">−</button>
-      <b class="w-9 text-center">${i.qty}</b>
-      <button data-a="inc" data-id="${i.id}" aria-label="Tambah stok" class="h-7 w-7 rounded-full text-slate-600 hover:bg-white hover:shadow-sm">+</button></div></td>
-    <td class="px-3 py-3 text-slate-600">${fmt(i.exp)}</td>
-    <td class="px-3 py-3">${pill(p3kStatus(i))}</td>
-    <td class="px-5 py-3 text-right whitespace-nowrap">
-      <button data-a="edit" data-id="${i.id}" class="rounded-lg px-3 py-1.5 text-sm font-semibold text-pln hover:bg-sky-50">Ubah</button>
-      <button data-a="del" data-id="${i.id}" class="rounded-lg px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50">Hapus</button></td></tr>`).join('')
-  : `<tr><td colspan="6" class="px-5 py-12 text-center text-slate-500">${!ready.p ? 'Memuat data...' : p3k.length ? 'Tidak ada item yang cocok dengan pencarian.' : 'Belum ada item P3K. Isi formulir di atas untuk menambah item pertama.'}</td></tr>`;
-  hero();
+function resetForm() {
+  const k = $('kat').value, c = $('katCustom').value;   // pertahankan kategori agar mudah input beruntun
+  $('f').reset(); $('kat').value = k; $('katCustom').value = c;
+  $('id').value = ''; $('eKind').value = ''; $('kat').disabled = false;
+  $('title').textContent = 'Tambah data'; $('save').textContent = 'Tambah data'; $('cancel').classList.add('hidden');
+  layout();
 }
-function resetP() { $('fP').reset(); $('pId').value = ''; $('pQty').value = 0; $('pMin').value = 5; $('pSave').textContent = 'Tambah item'; $('pTitle').textContent = 'Tambah item P3K'; $('pCancel').classList.add('hidden'); }
-$('fP').onsubmit = e => {
+$('cancel').onclick = resetForm;
+
+$('f').onsubmit = e => {
   e.preventDefault();
-  const d = { name: $('pName').value.trim(), lokasi: $('pLokasi').value.trim(), qty: Math.max(0, +$('pQty').value || 0), min: Math.max(0, +$('pMin').value || 0), exp: $('pExp').value };
-  const id = $('pId').value;
-  (id ? DB.update('p3k', id, d) : DB.add('p3k', d)).then(() => { resetP(); flash('pMsg', id ? 'Perubahan disimpan.' : 'Item ditambahkan.'); }).catch(fail);
-};
-$('pCancel').onclick = resetP; $('pQ').oninput = renderP;
-$('pRows').onclick = e => {
-  const b = e.target.closest('button'); if (!b) return;
-  const it = p3k.find(i => i.id === b.dataset.id); if (!it) return; const a = b.dataset.a;
-  if (a === 'inc') DB.update('p3k', it.id, { qty: it.qty + 1 }).catch(fail);
-  else if (a === 'dec') DB.update('p3k', it.id, { qty: Math.max(0, it.qty - 1) }).catch(fail);
-  else if (a === 'del') { if (confirm('Hapus "' + it.name + '"?')) DB.remove('p3k', it.id).then(() => flash('pMsg', 'Item dihapus.')).catch(fail); }
+  const id = $('id').value, kind = id ? $('eKind').value : ($('kat').value === 'P3K' ? 'p3k' : $('kat').value === 'APAR' ? 'apar' : 'barang');
+  const nama = $('nama').value.trim(), lokasi = $('lokasi').value.trim(), exp = $('exp').value;
+  let d;
+  if (kind === 'apar') d = { kode: nama, lokasi, jenis: $('jenis').value, berat: +$('berat').value || 0, tekanan: $('tekanan').value, exp, insp: $('insp').value };
   else {
-    $('pId').value = it.id; $('pName').value = it.name; $('pLokasi').value = it.lokasi; $('pQty').value = it.qty; $('pMin').value = it.min; $('pExp').value = it.exp || '';
-    $('pSave').textContent = 'Simpan perubahan'; $('pTitle').textContent = 'Ubah item P3K'; $('pCancel').classList.remove('hidden'); $('pName').focus(); window.scrollTo({ top: 0, behavior: 'smooth' });
+    d = { name: nama, lokasi, qty: Math.max(0, +$('qty').value || 0), min: Math.max(0, +$('min').value || 0), exp };
+    if (kind === 'barang') {
+      d.kategori = $('kat').value === 'Custom' ? $('katCustom').value.trim() : $('kat').value;
+      d.ukuran = $('ukuran').value.trim(); d.ket = $('ket').value.trim();
+    }
+  }
+  (id ? DB.update(kind, id, d) : DB.add(kind, d)).then(() => { resetForm(); flash(id ? 'Perubahan disimpan.' : 'Data ditambahkan.'); }).catch(fail);
+};
+
+// ---- Daftar gabungan ----
+function items() {
+  return p3k.map(i => ({ c: 'p3k', kat: 'P3K', i, s: p3kStatus(i) }))
+    .concat(apar.map(i => ({ c: 'apar', kat: 'APAR', i, s: aparStatus(i) })))
+    .concat(brg.map(i => ({ c: 'barang', kat: i.kategori || 'Lainnya', i, s: p3kStatus(i) })))
+    .sort((a, b) => byNew(a.i, b.i));
+}
+function render() {
+  const all = items();
+  heroStats(all.map(x => x.s));
+  // saran nama kategori custom yang sudah pernah dipakai
+  $('katList').innerHTML = [...new Set(brg.map(i => i.kategori).filter(k => k && !FIXED.includes(k)))].map(k => `<option value="${esc(k)}">`).join('');
+
+  const f = $('fKat').value, q = $('q').value.trim().toLowerCase();
+  const list = all.filter(x => (f === 'all' || (f === 'Lainnya' ? x.c === 'barang' && !FIXED.includes(x.kat) : x.kat === f))
+    && (!q || ((x.i.name || x.i.kode || '') + ' ' + x.i.lokasi + ' ' + x.kat).toLowerCase().includes(q)));
+  const ctl = (x, a, t) => `<button data-a="${a}" data-c="${x.c}" data-id="${x.i.id}" aria-label="${t}" class="h-7 w-7 rounded-full text-slate-600 hover:bg-white hover:shadow-sm">${a === 'inc' ? '+' : '−'}</button>`;
+  $('rows').innerHTML = list.length ? list.map(x => {
+    const i = x.i, isA = x.c === 'apar';
+    const detail = isA ? `${i.jenis}, ${i.berat} kg, tekanan ${i.tekanan}`
+      : x.c === 'barang' ? ([i.ukuran ? 'Ukuran ' + i.ukuran : '', i.ket].filter(Boolean).join(', ') || '-') : 'Minimum ' + i.min;
+    return `<tr class="hover:bg-slate-50/70">
+    <td class="px-5 py-3"><span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">${esc(x.kat)}</span></td>
+    <td class="px-3 py-3 font-semibold text-slate-900">${esc(isA ? i.kode : i.name)}</td>
+    <td class="px-3 py-3 text-slate-600">${esc(i.lokasi)}</td>
+    <td class="px-3 py-3 text-slate-600">${esc(detail)}</td>
+    <td class="px-3 py-3 text-center">${isA ? '<span class="text-slate-400">-</span>' : `<div class="inline-flex items-center rounded-full bg-slate-100 p-0.5">${ctl(x, 'dec', 'Kurangi stok')}<b class="w-9 text-center">${i.qty}</b>${ctl(x, 'inc', 'Tambah stok')}</div>`}</td>
+    <td class="px-3 py-3 text-slate-700">${fmt(i.exp)}${isA ? `<div class="text-xs text-slate-400">Inspeksi: ${fmt(i.insp)}</div>` : ''}</td>
+    <td class="px-3 py-3">${pill(x.s)}</td>
+    <td class="px-5 py-3 text-right whitespace-nowrap">
+      <button data-a="edit" data-c="${x.c}" data-id="${i.id}" class="rounded-lg px-3 py-1.5 text-sm font-semibold text-pln hover:bg-sky-50">Ubah</button>
+      <button data-a="del" data-c="${x.c}" data-id="${i.id}" class="rounded-lg px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50">Hapus</button></td></tr>`;
+  }).join('')
+  : `<tr><td colspan="8" class="px-5 py-12 text-center text-slate-500">${!(ready.p && ready.a && ready.b) ? 'Memuat data...' : all.length ? 'Tidak ada data yang cocok dengan pencarian atau filter.' : 'Belum ada data. Pilih kategori dan isi formulir di atas untuk menambah data pertama.'}</td></tr>`;
+}
+$('fKat').onchange = render; $('q').oninput = render;
+
+$('rows').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const c = b.dataset.c, a = b.dataset.a, src = c === 'p3k' ? p3k : c === 'apar' ? apar : brg;
+  const it = src.find(i => i.id === b.dataset.id); if (!it) return;
+  if (a === 'inc') DB.update(c, it.id, { qty: it.qty + 1 }).catch(fail);
+  else if (a === 'dec') DB.update(c, it.id, { qty: Math.max(0, it.qty - 1) }).catch(fail);
+  else if (a === 'del') { if (confirm('Hapus "' + (it.name || it.kode) + '"?')) DB.remove(c, it.id).then(() => flash('Data dihapus.')).catch(fail); }
+  else {
+    $('f').reset();
+    $('id').value = it.id; $('eKind').value = c;
+    $('kat').value = c === 'p3k' ? 'P3K' : c === 'apar' ? 'APAR' : (FIXED.includes(it.kategori) ? it.kategori : 'Custom');
+    if (c === 'barang' && $('kat').value === 'Custom') $('katCustom').value = it.kategori || '';
+    $('kat').disabled = true; layout();
+    $('nama').value = it.name || it.kode || ''; $('lokasi').value = it.lokasi || ''; $('exp').value = it.exp || '';
+    if (c === 'apar') { $('jenis').value = it.jenis; $('berat').value = it.berat; $('tekanan').value = it.tekanan; $('insp').value = it.insp || ''; }
+    else { $('qty').value = it.qty; $('min').value = it.min; }
+    if (c === 'barang') { $('ukuran').value = it.ukuran || ''; $('ket').value = it.ket || ''; }
+    $('title').textContent = 'Ubah data'; $('save').textContent = 'Simpan perubahan'; $('cancel').classList.remove('hidden');
+    $('nama').focus(); window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 };
 
-// ---- APAR ----
-function renderA() {
-  const q = $('aQ').value.trim().toLowerCase();
-  const list = apar.filter(i => !q || (i.kode + ' ' + i.lokasi).toLowerCase().includes(q));
-  $('aRows').innerHTML = list.length ? list.map(i => `<tr class="hover:bg-slate-50/70">
-    <td class="px-5 py-3 font-bold text-slate-900">${esc(i.kode)}</td>
-    <td class="px-3 py-3 text-slate-600">${esc(i.lokasi)}</td>
-    <td class="px-3 py-3 text-slate-600">${esc(i.jenis)}, ${i.berat} kg</td>
-    <td class="px-3 py-3 text-slate-600">${esc(i.tekanan)}</td>
-    <td class="px-3 py-3 text-slate-700">${fmt(i.exp)}<div class="text-xs text-slate-400">Inspeksi: ${fmt(i.insp)}</div></td>
-    <td class="px-3 py-3">${pill(aparStatus(i))}</td>
-    <td class="px-5 py-3 text-right whitespace-nowrap">
-      <button data-a="edit" data-id="${i.id}" class="rounded-lg px-3 py-1.5 text-sm font-semibold text-pln hover:bg-sky-50">Ubah</button>
-      <button data-a="del" data-id="${i.id}" class="rounded-lg px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50">Hapus</button></td></tr>`).join('')
-  : `<tr><td colspan="7" class="px-5 py-12 text-center text-slate-500">${!ready.a ? 'Memuat data...' : apar.length ? 'Tidak ada APAR yang cocok dengan pencarian.' : 'Belum ada data APAR. Isi formulir di atas untuk menambah unit pertama.'}</td></tr>`;
-  hero();
-}
-function resetA() { $('fA').reset(); $('aId').value = ''; $('aBerat').value = 3; $('aSave').textContent = 'Tambah APAR'; $('aTitle').textContent = 'Tambah unit APAR'; $('aCancel').classList.add('hidden'); }
-$('fA').onsubmit = e => {
-  e.preventDefault();
-  const d = { kode: $('aKode').value.trim(), lokasi: $('aLokasi').value.trim(), jenis: $('aJenis').value, berat: +$('aBerat').value || 0, tekanan: $('aTekanan').value, exp: $('aExp').value, insp: $('aInsp').value };
-  const id = $('aId').value;
-  (id ? DB.update('apar', id, d) : DB.add('apar', d)).then(() => { resetA(); flash('aMsg', id ? 'Perubahan disimpan.' : 'APAR ditambahkan.'); }).catch(fail);
-};
-$('aCancel').onclick = resetA; $('aQ').oninput = renderA;
-$('aRows').onclick = e => {
-  const b = e.target.closest('button'); if (!b) return;
-  const it = apar.find(i => i.id === b.dataset.id); if (!it) return;
-  if (b.dataset.a === 'del') { if (confirm('Hapus ' + it.kode + '?')) DB.remove('apar', it.id).then(() => flash('aMsg', 'APAR dihapus.')).catch(fail); }
-  else {
-    $('aId').value = it.id; $('aKode').value = it.kode; $('aLokasi').value = it.lokasi; $('aJenis').value = it.jenis; $('aBerat').value = it.berat; $('aTekanan').value = it.tekanan; $('aExp').value = it.exp; $('aInsp').value = it.insp || '';
-    $('aSave').textContent = 'Simpan perubahan'; $('aTitle').textContent = 'Ubah unit APAR'; $('aCancel').classList.remove('hidden'); $('aKode').focus(); window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-};
-renderP(); renderA();
+// Kategori awal dari alamat, contoh Tambah.html?jenis=apar
+const j = (new URLSearchParams(location.search).get('jenis') || '').toLowerCase();
+const start0 = { p3k: 'P3K', apar: 'APAR', baju: 'Baju', sepatu: 'Sepatu', custom: 'Custom' }[j];
+if (start0) $('kat').value = start0;
+layout(); render();
 
 }
 

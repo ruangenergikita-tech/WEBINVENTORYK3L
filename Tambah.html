@@ -16,7 +16,7 @@ tailwind.config = { theme: { extend: {
 </script>
 <style type="text/tailwindcss">
 @layer components {
-  .inp { @apply w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-pln focus:ring-4 focus:ring-pln/15; }
+  .inp { @apply w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-pln focus:ring-4 focus:ring-pln/15 disabled:bg-slate-100 disabled:text-slate-500; }
   .lbl { @apply flex flex-col gap-1.5 text-sm font-medium text-slate-600; }
 }
 </style>
@@ -32,14 +32,12 @@ tailwind.config = { theme: { extend: {
   <div class="h-1 bg-gradient-to-r from-pln via-sun to-hsse"></div>
   <div class="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
     <a href="Dashboard.html" class="flex items-center gap-3 min-w-0">
-      <!-- Logo: simpan gambar sebagai logo-pln.png dan logo-hsse.png di folder yang sama,
-           atau tempel kembali tag <img src="data:image/png;base64,..."> dari file lama Anda -->
       <img src="logo-pln.png" alt="Logo PLN" class="h-10 w-auto">
       <span class="w-px h-8 bg-slate-200"></span>
       <img src="logo-hsse.png" alt="Logo HSSE PLN" class="h-10 w-auto">
       <span class="hidden lg:block leading-tight pl-1">
         <span class="block font-extrabold text-navy-900">Inventori K3</span>
-        <span class="block text-xs text-slate-500">Peralatan P3K dan APAR</span>
+        <span class="block text-xs text-slate-500">Peralatan dan perlengkapan K3</span>
       </span>
     </a>
     <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -61,7 +59,7 @@ tailwind.config = { theme: { extend: {
   <div class="relative max-w-6xl mx-auto px-4 pt-10 pb-28 flex flex-wrap items-end justify-between gap-6">
     <div class="max-w-xl">
       <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight">Tambah dan Kelola Data</h1>
-      <p class="mt-2 text-sky-100/85 leading-relaxed">Input, ubah, dan hapus data P3K serta APAR di sini. Hasilnya langsung tampil di halaman Data.</p>
+      <p class="mt-2 text-sky-100/85 leading-relaxed">Pilih kategori (P3K, APAR, Baju, Sepatu, atau Custom), isi datanya, lalu simpan. Hasilnya langsung tampil di halaman Data.</p>
     </div>
     <div class="flex gap-3">
       <div class="rounded-2xl bg-white/10 ring-1 ring-white/20 backdrop-blur px-5 py-3 min-w-[104px]"><div id="hTotal" class="text-3xl font-extrabold">0</div><div class="text-xs text-sky-100/80">Total</div></div>
@@ -73,116 +71,123 @@ tailwind.config = { theme: { extend: {
 
 <main class="max-w-6xl w-full mx-auto px-4 -mt-16 relative space-y-6">
 
-  <!-- Pilih jenis data -->
-  <div class="flex gap-2">
-    <button id="tabP3k" type="button" class="rounded-full px-5 py-2.5 text-sm font-semibold transition bg-navy-900 text-white">P3K</button>
-    <button id="tabApar" type="button" class="rounded-full px-5 py-2.5 text-sm font-semibold transition bg-white text-slate-600 hover:bg-slate-100 ring-1 ring-slate-200">APAR</button>
-  </div>
+  <!-- ===================== FORMULIR ===================== -->
+  <form id="f" class="card p-5 md:p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 id="title" class="text-lg font-bold text-navy-900">Tambah data</h2>
+      <span id="msg" class="text-sm font-semibold text-emerald-700" role="status"></span>
+    </div>
+    <input type="hidden" id="id">
+    <input type="hidden" id="eKind">
 
-  <!-- ===================== P3K ===================== -->
-  <div id="panP3k" class="space-y-6">
-    <form id="fP" class="card p-5 md:p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h2 id="pTitle" class="text-lg font-bold text-navy-900">Tambah item P3K</h2>
-        <span id="pMsg" class="text-sm font-semibold text-emerald-700" role="status"></span>
-      </div>
-      <input type="hidden" id="pId">
-      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <label class="lbl">Nama item<input id="pName" required maxlength="80" placeholder="Contoh: Plester luka" class="inp"></label>
-        <label class="lbl">Lokasi kotak P3K<input id="pLokasi" required maxlength="60" placeholder="Contoh: Lobi lantai 1" class="inp"></label>
-        <label class="lbl">Tanggal kedaluwarsa<input id="pExp" type="date" class="inp"></label>
-        <label class="lbl">Jumlah<input id="pQty" type="number" min="0" value="0" required class="inp"></label>
-        <label class="lbl">Stok minimum<input id="pMin" type="number" min="0" value="5" required class="inp"></label>
-        <div class="flex items-end gap-2">
-          <button id="pSave" type="submit" class="rounded-xl bg-sun px-5 py-2.5 text-sm font-bold text-navy-900 shadow-sm hover:bg-yellow-300 transition focus:outline-none focus-visible:ring-4 focus-visible:ring-sun/50">Tambah item</button>
-          <button id="pCancel" type="button" class="hidden rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Batal</button>
-        </div>
-      </div>
-    </form>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <label class="lbl"><span>Kategori</span>
+        <select id="kat" class="inp">
+          <option value="P3K">P3K</option>
+          <option value="APAR">APAR</option>
+          <option value="Baju">Baju</option>
+          <option value="Sepatu">Sepatu</option>
+          <option value="Custom">Custom (isi sendiri)</option>
+        </select>
+      </label>
 
-    <section class="card overflow-hidden">
-      <div class="p-4 md:p-5 flex flex-wrap items-center gap-3 border-b border-slate-100">
-        <h2 class="text-lg font-bold text-navy-900 mr-auto">Daftar item P3K</h2>
-        <input id="pQ" type="search" placeholder="Cari nama atau lokasi" class="inp !w-56" aria-label="Cari P3K">
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm min-w-[760px]">
-          <thead class="bg-slate-50 text-left text-slate-500">
-            <tr>
-              <th class="px-5 py-3 font-semibold">Item</th>
-              <th class="px-3 py-3 font-semibold">Lokasi</th>
-              <th class="px-3 py-3 font-semibold text-center">Stok</th>
-              <th class="px-3 py-3 font-semibold">Kedaluwarsa</th>
-              <th class="px-3 py-3 font-semibold">Status</th>
-              <th class="px-5 py-3"></th>
-            </tr>
-          </thead>
-          <tbody id="pRows" class="divide-y divide-slate-100"></tbody>
-        </table>
-      </div>
-    </section>
-  </div>
+      <label id="wCustom" class="lbl hidden"><span>Nama kategori</span>
+        <input id="katCustom" list="katList" maxlength="40" placeholder="Contoh: Helm, Sarung tangan, Kacamata" class="inp">
+        <datalist id="katList"></datalist>
+      </label>
 
-  <!-- ===================== APAR ===================== -->
-  <div id="panApar" class="space-y-6 hidden">
-    <form id="fA" class="card p-5 md:p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h2 id="aTitle" class="text-lg font-bold text-navy-900">Tambah unit APAR</h2>
-        <span id="aMsg" class="text-sm font-semibold text-emerald-700" role="status"></span>
-      </div>
-      <input type="hidden" id="aId">
-      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <label class="lbl">Kode APAR<input id="aKode" required maxlength="30" placeholder="Contoh: APAR-001" class="inp"></label>
-        <label class="lbl lg:col-span-2">Lokasi<input id="aLokasi" required maxlength="60" placeholder="Contoh: Gudang pintu timur" class="inp"></label>
-        <label class="lbl">Berat (kg)<input id="aBerat" type="number" min="0" step="0.1" value="3" required class="inp"></label>
-        <label class="lbl">Jenis media
-          <select id="aJenis" class="inp">
-            <option>Dry chemical powder</option>
-            <option>CO2</option>
-            <option>Foam</option>
-            <option>Air</option>
-            <option>Clean agent</option>
-          </select>
-        </label>
-        <label class="lbl">Tekanan jarum indikator
-          <select id="aTekanan" class="inp">
-            <option>Normal</option>
-            <option>Rendah</option>
-            <option>Berlebih</option>
-          </select>
-        </label>
-        <label class="lbl">Jadwal isi ulang<input id="aExp" type="date" required class="inp"></label>
-        <label class="lbl">Inspeksi terakhir<input id="aInsp" type="date" class="inp"></label>
-        <div class="flex items-center gap-2 sm:col-span-2 lg:col-span-4">
-          <button id="aSave" type="submit" class="rounded-xl bg-sun px-5 py-2.5 text-sm font-bold text-navy-900 shadow-sm hover:bg-yellow-300 transition focus:outline-none focus-visible:ring-4 focus-visible:ring-sun/50">Tambah APAR</button>
-          <button id="aCancel" type="button" class="hidden rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Batal</button>
-        </div>
-      </div>
-    </form>
+      <label class="lbl"><span id="namaLbl">Nama item</span>
+        <input id="nama" required maxlength="80" placeholder="Contoh: Plester luka" class="inp">
+      </label>
 
-    <section class="card overflow-hidden">
-      <div class="p-4 md:p-5 flex flex-wrap items-center gap-3 border-b border-slate-100">
-        <h2 class="text-lg font-bold text-navy-900 mr-auto">Daftar APAR</h2>
-        <input id="aQ" type="search" placeholder="Cari kode atau lokasi" class="inp !w-56" aria-label="Cari APAR">
+      <label class="lbl"><span id="lokasiLbl">Lokasi</span>
+        <input id="lokasi" required maxlength="60" placeholder="Contoh: Lobi lantai 1" class="inp">
+      </label>
+
+      <!-- Stok (P3K, Baju, Sepatu, Custom) -->
+      <label id="wQty" class="lbl"><span>Jumlah</span>
+        <input id="qty" type="number" min="0" value="0" class="inp">
+      </label>
+      <label id="wMin" class="lbl"><span>Stok minimum</span>
+        <input id="min" type="number" min="0" value="5" class="inp">
+      </label>
+
+      <!-- Khusus Baju, Sepatu, Custom -->
+      <label id="wUkuran" class="lbl hidden"><span>Ukuran</span>
+        <input id="ukuran" maxlength="30" placeholder="Contoh: L, 42, All size" class="inp">
+      </label>
+      <label id="wKet" class="lbl hidden sm:col-span-2"><span>Keterangan (opsional)</span>
+        <input id="ket" maxlength="120" placeholder="Contoh: Warna oranye, untuk teknisi lapangan" class="inp">
+      </label>
+
+      <!-- Khusus APAR -->
+      <label id="wBerat" class="lbl hidden"><span>Berat (kg)</span>
+        <input id="berat" type="number" min="0" step="0.1" value="3" class="inp">
+      </label>
+      <label id="wJenis" class="lbl hidden"><span>Jenis media</span>
+        <select id="jenis" class="inp">
+          <option>Dry chemical powder</option>
+          <option>CO2</option>
+          <option>Foam</option>
+          <option>Air</option>
+          <option>Clean agent</option>
+        </select>
+      </label>
+      <label id="wTekanan" class="lbl hidden"><span>Tekanan jarum indikator</span>
+        <select id="tekanan" class="inp">
+          <option>Normal</option>
+          <option>Rendah</option>
+          <option>Berlebih</option>
+        </select>
+      </label>
+      <label id="wInsp" class="lbl hidden"><span>Inspeksi terakhir</span>
+        <input id="insp" type="date" class="inp">
+      </label>
+
+      <!-- Tanggal (semua kategori) -->
+      <label class="lbl"><span id="expLbl">Tanggal kedaluwarsa (opsional)</span>
+        <input id="exp" type="date" class="inp">
+      </label>
+
+      <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-3">
+        <button id="save" type="submit" class="rounded-xl bg-sun px-5 py-2.5 text-sm font-bold text-navy-900 shadow-sm hover:bg-yellow-300 transition focus:outline-none focus-visible:ring-4 focus-visible:ring-sun/50">Tambah data</button>
+        <button id="cancel" type="button" class="hidden rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Batal</button>
       </div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm min-w-[840px]">
-          <thead class="bg-slate-50 text-left text-slate-500">
-            <tr>
-              <th class="px-5 py-3 font-semibold">Kode</th>
-              <th class="px-3 py-3 font-semibold">Lokasi</th>
-              <th class="px-3 py-3 font-semibold">Jenis dan berat</th>
-              <th class="px-3 py-3 font-semibold">Tekanan</th>
-              <th class="px-3 py-3 font-semibold">Isi ulang</th>
-              <th class="px-3 py-3 font-semibold">Status</th>
-              <th class="px-5 py-3"></th>
-            </tr>
-          </thead>
-          <tbody id="aRows" class="divide-y divide-slate-100"></tbody>
-        </table>
-      </div>
-    </section>
-  </div>
+    </div>
+  </form>
+
+  <!-- ===================== DAFTAR ===================== -->
+  <section class="card overflow-hidden">
+    <div class="p-4 md:p-5 flex flex-wrap items-center gap-3 border-b border-slate-100">
+      <h2 class="text-lg font-bold text-navy-900 mr-auto">Daftar semua data</h2>
+      <select id="fKat" class="inp !w-auto" aria-label="Filter kategori">
+        <option value="all">Semua kategori</option>
+        <option value="P3K">P3K</option>
+        <option value="APAR">APAR</option>
+        <option value="Baju">Baju</option>
+        <option value="Sepatu">Sepatu</option>
+        <option value="Lainnya">Custom</option>
+      </select>
+      <input id="q" type="search" placeholder="Cari nama atau lokasi" class="inp !w-56" aria-label="Cari">
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm min-w-[980px]">
+        <thead class="bg-slate-50 text-left text-slate-500">
+          <tr>
+            <th class="px-5 py-3 font-semibold">Kategori</th>
+            <th class="px-3 py-3 font-semibold">Nama atau kode</th>
+            <th class="px-3 py-3 font-semibold">Lokasi</th>
+            <th class="px-3 py-3 font-semibold">Detail</th>
+            <th class="px-3 py-3 font-semibold text-center">Stok</th>
+            <th class="px-3 py-3 font-semibold">Jatuh tempo</th>
+            <th class="px-3 py-3 font-semibold">Status</th>
+            <th class="px-5 py-3"></th>
+          </tr>
+        </thead>
+        <tbody id="rows" class="divide-y divide-slate-100"></tbody>
+      </table>
+    </div>
+  </section>
 </main>
 
 <footer class="max-w-6xl w-full mx-auto px-4 py-8 mt-auto text-xs text-slate-500 flex flex-wrap justify-between gap-2">
