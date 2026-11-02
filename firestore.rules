@@ -7,7 +7,7 @@ service cloud.firestore {
     function diizinkan() {
       return request.auth != null
         && request.auth.token.email in [
-          'ganti-dengan-email-anda@contoh.com'
+          'ruangenergikita@gmail.com'
         ];
     }
 

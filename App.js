@@ -5,16 +5,17 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
 
 /* =====================================================================
    1. KONFIGURASI FIREBASE
-   Isi dengan data dari Firebase Console:
+   Diambil dari Firebase Console:
    Project settings > Your apps > Web app > SDK setup and configuration > Config
    ===================================================================== */
 const FIREBASE_CONFIG = {
-  apiKey: "ISI_API_KEY",
-  authDomain: "ISI-PROJECT-ID.firebaseapp.com",
-  projectId: "ISI-PROJECT-ID",
-  storageBucket: "ISI-PROJECT-ID.firebasestorage.app",
-  messagingSenderId: "ISI",
-  appId: "ISI_APP_ID"
+  apiKey: "AIzaSyD5fZyadOvpO5IbUyoRXNonZ30n0GBUL6w",
+  authDomain: "inventoryk3l.firebaseapp.com",
+  projectId: "inventoryk3l",
+  storageBucket: "inventoryk3l.firebasestorage.app",
+  messagingSenderId: "885252168172",
+  appId: "1:885252168172:web:b44872f657dc04262b08c9",
+  measurementId: "G-JMS1KTR7DG"
 };
 
 /* =====================================================================
@@ -179,8 +180,8 @@ function breakdown(title,href,sts){
 
 let p3k=[],apar=[],got={p:0,a:0};
 function render(){
-  const sp=p3k.map(i=>({t:'P3K',href:'P3K.html',n:i.name,l:i.lokasi,s:p3kStatus(i),exp:i.exp}));
-  const sa=apar.map(i=>({t:'APAR',href:'APAR.html',n:i.kode,l:i.lokasi,s:aparStatus(i),exp:i.exp}));
+  const sp=p3k.map(i=>({t:'P3K',href:'P3k.html',n:i.name,l:i.lokasi,s:p3kStatus(i),exp:i.exp}));
+  const sa=apar.map(i=>({t:'APAR',href:'Apar.html',n:i.kode,l:i.lokasi,s:aparStatus(i),exp:i.exp}));
   const all=sp.concat(sa),bad=all.filter(x=>x.s[1]!=='ok');
   $('demoBox').classList.toggle('hidden',!(got.p&&got.a)||all.length>0);
 
@@ -198,7 +199,7 @@ function render(){
     <h2 class="font-bold text-navy-900 mb-3 self-start">Tingkat kesiapan</h2>
     <div class="relative"><svg viewBox="0 0 120 120" class="h-40 w-40 -rotate-90"><circle cx="60" cy="60" r="52" fill="none" stroke="#E2E8F0" stroke-width="12"/><circle cx="60" cy="60" r="52" fill="none" stroke="${col}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${pct===null?0:C*pct/100} ${C}"/></svg>
     <div class="absolute inset-0 flex flex-col items-center justify-center"><span class="text-3xl font-extrabold text-navy-900">${pct===null?'-':pct+'%'}</span><span class="text-xs text-slate-500">item dalam kondisi aman</span></div></div></div>`;
-  $('stats').innerHTML=ring+breakdown('Status P3K','P3K.html',sp.map(x=>x.s))+breakdown('Status APAR','APAR.html',sa.map(x=>x.s));
+  $('stats').innerHTML=ring+breakdown('Status P3K','P3k.html',sp.map(x=>x.s))+breakdown('Status APAR','Apar.html',sa.map(x=>x.s));
 
   const up=all.filter(x=>x.exp&&daysLeft(x.exp)>=0&&daysLeft(x.exp)<=90).sort((a,b)=>a.exp.localeCompare(b.exp)).slice(0,7);
   $('timeline').innerHTML=up.length?up.map(x=>{const d=new Date(x.exp+'T00:00:00'),n=daysLeft(x.exp);
