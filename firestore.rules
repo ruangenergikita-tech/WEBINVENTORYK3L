@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Daftar email yang boleh memakai aplikasi (huruf kecil semua).
+    // Tambahkan email baru di sini setiap kali membuat akun di Authentication.
+    function diizinkan() {
+      return request.auth != null
+        && request.auth.token.email in [
+          'ganti-dengan-email-anda@contoh.com'
+        ];
+    }
+
+    match /p3k/{id}  { allow read, write: if diizinkan(); }
+    match /apar/{id} { allow read, write: if diizinkan(); }
+  }
+}
