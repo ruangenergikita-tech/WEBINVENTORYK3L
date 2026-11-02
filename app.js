@@ -372,8 +372,8 @@ $('f').onsubmit=e=>{
   e.preventDefault();
   const d={name:$('name').value.trim(),lokasi:$('lokasi').value.trim(),qty:Math.max(0,+$('qty').value||0),min:Math.max(0,+$('min').value||0),exp:$('exp').value};
   const id=$('id').value;
-  (id?DB.update(COL,id,d):DB.add(COL,d)).catch(fail);
-  resetForm();
+  // Form dikosongkan hanya kalau penyimpanan berhasil, supaya isian tidak hilang saat gagal.
+  (id?DB.update(COL,id,d):DB.add(COL,d)).then(resetForm).catch(fail);
 };
 $('cancelBtn').onclick=resetForm;$('q').oninput=render;$('flt').onchange=render;
 $('rows').onclick=e=>{
@@ -426,8 +426,8 @@ $('f').onsubmit=e=>{
   e.preventDefault();
   const d={kode:$('kode').value.trim(),lokasi:$('lokasi').value.trim(),jenis:$('jenis').value,berat:+$('berat').value||0,tekanan:$('tekanan').value,exp:$('exp').value,insp:$('insp').value};
   const id=$('id').value;
-  (id?DB.update(COL,id,d):DB.add(COL,d)).catch(fail);
-  resetForm();
+  // Form dikosongkan hanya kalau penyimpanan berhasil, supaya isian tidak hilang saat gagal.
+  (id?DB.update(COL,id,d):DB.add(COL,d)).then(resetForm).catch(fail);
 };
 $('cancelBtn').onclick=resetForm;$('q').oninput=render;$('flt').onchange=render;
 $('rows').onclick=e=>{
