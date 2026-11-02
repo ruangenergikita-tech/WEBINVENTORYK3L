@@ -145,14 +145,21 @@ tailwind.config = { theme: { extend: {
       </label>
 
       <!-- Tanggal (semua kategori) -->
-      <label id="wTipeTgl" class="lbl"><span>Jenis tanggal</span>
+      <label id="wTipeTgl" class="lbl"><span>Jenis penilaian</span>
         <select id="tipeTgl" class="inp">
-          <option value="kedaluwarsa">Kedaluwarsa</option>
-          <option value="kelayakan">Kelayakan</option>
+          <option value="kedaluwarsa">Kedaluwarsa (pakai tanggal)</option>
+          <option value="kelayakan">Kelayakan (pakai kondisi)</option>
         </select>
       </label>
-      <label class="lbl"><span id="expLbl">Tanggal kedaluwarsa (opsional)</span>
+      <label id="wExp" class="lbl"><span id="expLbl">Tanggal kedaluwarsa (opsional)</span>
         <input id="exp" type="date" class="inp">
+      </label>
+      <label id="wKondisi" class="lbl hidden"><span>Kondisi kelayakan</span>
+        <select id="kondisi" class="inp">
+          <option>Layak digunakan</option>
+          <option>Aman digunakan</option>
+          <option>Sudah tidak layak</option>
+        </select>
       </label>
 
       <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-3">

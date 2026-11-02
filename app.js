@@ -29,15 +29,25 @@ const fmt=d=>d?new Date(d+'T00:00:00').toLocaleDateString('id-ID',{day:'numeric'
 const TONE={ok:'bg-emerald-50 text-emerald-700 ring-emerald-600/20',warn:'bg-amber-50 text-amber-800 ring-amber-600/25',bad:'bg-red-50 text-red-700 ring-red-600/20'};
 const pill=s=>`<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${TONE[s[1]]}">${esc(s[0])}</span>`;
 function p3kStatus(i){
-  const d=i.exp?daysLeft(i.exp):null, lay=i.tipeTgl==='kelayakan';
-  if(d!==null&&d<0)return[(lay?'Masa layak habis ':'Kedaluwarsa ')+(-d)+' hari lalu','bad'];
+  if(i.tipeTgl==='kelayakan'){
+    const k=i.kondisi||'Layak digunakan';
+    if(k==='Sudah tidak layak')return['Sudah tidak layak','bad'];
+    if(i.qty===0)return['Stok habis','bad'];
+    if(i.qty<=i.min)return['Stok menipis ('+i.qty+' dari min. '+i.min+')','warn'];
+    return[k,'ok'];
+  }
+  const d=i.exp?daysLeft(i.exp):null;
+  if(d!==null&&d<0)return['Kedaluwarsa '+(-d)+' hari lalu','bad'];
   if(i.qty===0)return['Stok habis','bad'];
-  if(d!==null&&d<=30)return[(lay?'Masa layak habis dalam ':'Kedaluwarsa dalam ')+d+' hari','warn'];
+  if(d!==null&&d<=30)return['Kedaluwarsa dalam '+d+' hari','warn'];
   if(i.qty<=i.min)return['Stok menipis ('+i.qty+' dari min. '+i.min+')','warn'];
   return['Aman','ok'];
 }
-// Tanggal + keterangan jenisnya (kedaluwarsa / kelayakan)
-const tgl=i=>i.exp?fmt(i.exp)+`<div class="text-xs text-slate-400">${i.tipeTgl==='kelayakan'?'Batas kelayakan':'Kedaluwarsa'}</div>`:'-';
+// Tampilan kolom tanggal: kedaluwarsa pakai tanggal, kelayakan pakai kondisi
+const tgl=i=>{
+  if(i.tipeTgl==='kelayakan')return esc(i.kondisi||'Layak digunakan')+'<div class="text-xs text-slate-400">Kelayakan</div>';
+  return i.exp?fmt(i.exp)+'<div class="text-xs text-slate-400">Kedaluwarsa</div>':'-';
+};
 function aparStatus(i){
   const d=daysLeft(i.exp);
   if(d<0)return['Isi ulang terlambat '+(-d)+' hari','bad'];
@@ -164,7 +174,8 @@ const ICON={
  plus:'<path d="M12 4.5v15m7.5-7.5h-15"/>',
  fire:'<path d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.047 8.287 8.287 0 0 0 9 9.601a8.983 8.983 0 0 1 3.361-6.867 8.21 8.21 0 0 0 3 2.48Z"/><path d="M12 18a3.75 3.75 0 0 0 .495-7.468 5.99 5.99 0 0 0-1.925 3.547 5.975 5.975 0 0 1-2.133-1.001A3.75 3.75 0 0 0 12 18Z"/>',
  warn:'<path d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>',
- clock:'<path d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>'
+ clock:'<path d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>',
+ box:'<path d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"/>'
 };
 const svg=p=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6">${p}</svg>`;
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -180,17 +191,19 @@ function breakdown(title,href,sts){
     <div class="space-y-2">${row('bg-emerald-500','Aman',c.ok)}${row('bg-amber-400','Perlu segera ditangani',c.warn)}${row('bg-red-500','Mendesak',c.bad)}</div></div>`;
 }
 
-let p3k=[],apar=[],got={p:0,a:0};
+let p3k=[],apar=[],brg=[],got={p:0,a:0,b:0};
 function render(){
   const sp=p3k.map(i=>({t:'P3K',href:'Data.html',n:i.name,l:i.lokasi,s:p3kStatus(i),exp:i.exp}));
   const sa=apar.map(i=>({t:'APAR',href:'Data.html',n:i.kode,l:i.lokasi,s:aparStatus(i),exp:i.exp}));
-  const all=sp.concat(sa),bad=all.filter(x=>x.s[1]!=='ok');
-  $('demoBox').classList.toggle('hidden',!(got.p&&got.a)||all.length>0);
+  const sb=brg.map(i=>({t:i.kategori||'Lainnya',href:'Data.html',n:i.name+(i.ukuran?' ('+i.ukuran+')':''),l:i.lokasi,s:p3kStatus(i),exp:i.exp}));
+  const all=sp.concat(sa,sb),bad=all.filter(x=>x.s[1]!=='ok');
+  $('demoBox').classList.toggle('hidden',!(got.p&&got.a&&got.b)||all.length>0);
 
   const card=(l,v,ic,top,bg)=>`<div class="card p-4 border-t-4 ${top}"><div class="flex items-center justify-between"><div class="text-sm text-slate-500">${l}</div><div class="rounded-xl p-2 ${bg}">${svg(ic)}</div></div><div class="mt-2 text-3xl font-extrabold text-navy-900">${v}</div></div>`;
   const soon=all.filter(x=>x.exp&&daysLeft(x.exp)>=0&&daysLeft(x.exp)<=30).length;
   $('cards').innerHTML=card('Item P3K',p3k.length,ICON.plus,'border-hsse','bg-emerald-50 text-hsse')
     +card('Unit APAR',apar.length,ICON.fire,'border-pln','bg-sky-50 text-pln')
+    +card('Perlengkapan lain',brg.length,ICON.box,'border-violet-500','bg-violet-50 text-violet-600')
     +card('Perlu tindakan',bad.length,ICON.warn,'border-red-500','bg-red-50 text-red-600')
     +card('Jatuh tempo 30 hari',soon,ICON.clock,'border-sun','bg-yellow-50 text-yellow-600');
 
@@ -201,7 +214,7 @@ function render(){
     <h2 class="font-bold text-navy-900 mb-3 self-start">Tingkat kesiapan</h2>
     <div class="relative"><svg viewBox="0 0 120 120" class="h-40 w-40 -rotate-90"><circle cx="60" cy="60" r="52" fill="none" stroke="#E2E8F0" stroke-width="12"/><circle cx="60" cy="60" r="52" fill="none" stroke="${col}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${pct===null?0:C*pct/100} ${C}"/></svg>
     <div class="absolute inset-0 flex flex-col items-center justify-center"><span class="text-3xl font-extrabold text-navy-900">${pct===null?'-':pct+'%'}</span><span class="text-xs text-slate-500">item dalam kondisi aman</span></div></div></div>`;
-  $('stats').innerHTML=ring+breakdown('Status P3K','Tambah.html?jenis=p3k',sp.map(x=>x.s))+breakdown('Status APAR','Tambah.html?jenis=apar',sa.map(x=>x.s));
+  $('stats').innerHTML=ring+breakdown('Status P3K','Tambah.html?jenis=p3k',sp.map(x=>x.s))+breakdown('Status APAR','Tambah.html?jenis=apar',sa.map(x=>x.s))+breakdown('Status perlengkapan lain','Tambah.html',sb.map(x=>x.s));
 
   const up=all.filter(x=>x.exp&&daysLeft(x.exp)>=0&&daysLeft(x.exp)<=90).sort((a,b)=>a.exp.localeCompare(b.exp)).slice(0,7);
   $('timeline').innerHTML=up.length?up.map(x=>{const d=new Date(x.exp+'T00:00:00'),n=daysLeft(x.exp);
@@ -230,7 +243,7 @@ function renderCharts() {
     if (!has && charts[id]) { charts[id].destroy(); delete charts[id]; }
   };
   const draw = (id, cfg) => { if (charts[id]) charts[id].destroy(); charts[id] = new Chart($(id), cfg); };
-  const sp = p3k.map(i => [i, p3kStatus(i)]), sa = apar.map(i => [i, aparStatus(i)]);
+  const sp = p3k.map(i => [i, p3kStatus(i)]), sa = apar.map(i => [i, aparStatus(i)]), sb = brg.map(i => [i, p3kStatus(i)]);
 
   // 1. Stok semua barang P3K
   show('chP3k', sp.length > 0);
@@ -246,6 +259,20 @@ function renderCharts() {
         scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } } });
   }
 
+  // 1b. Stok perlengkapan lain (Baju, Sepatu, Custom)
+  show('chBrg', sb.length > 0);
+  if (sb.length) {
+    $('chBrgWrap').style.height = Math.max(220, sb.length * 38 + 80) + 'px';
+    draw('chBrg', { type: 'bar',
+      data: { labels: sb.map(([i]) => (i.kategori || 'Lainnya') + ': ' + i.name + (i.ukuran ? ' ' + i.ukuran : '') + ' (' + i.lokasi + ')'),
+        datasets: [
+          { label: 'Stok', data: sb.map(([i]) => i.qty), backgroundColor: sb.map(([, s]) => COLS[s[1]]), borderRadius: 4 },
+          { label: 'Stok minimum', data: sb.map(([i]) => i.min), backgroundColor: '#CBD5E1', borderRadius: 4 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } } });
+  }
+
   // 2. APAR per jenis media
   const byJenis = {}; apar.forEach(i => { byJenis[i.jenis] = (byJenis[i.jenis] || 0) + 1; });
   const jl = Object.keys(byJenis);
@@ -256,13 +283,13 @@ function renderCharts() {
 
   // 3. Status seluruh barang
   const cnt = (list, k) => list.filter(([, s]) => s[1] === k).length;
-  show('chStatus', sp.length + sa.length > 0);
-  if (sp.length + sa.length) draw('chStatus', { type: 'bar',
-    data: { labels: ['P3K', 'APAR'],
+  show('chStatus', sp.length + sa.length + sb.length > 0);
+  if (sp.length + sa.length + sb.length) draw('chStatus', { type: 'bar',
+    data: { labels: ['P3K', 'APAR', 'Lainnya'],
       datasets: [
-        { label: 'Aman', data: [cnt(sp, 'ok'), cnt(sa, 'ok')], backgroundColor: COLS.ok },
-        { label: 'Perlu segera ditangani', data: [cnt(sp, 'warn'), cnt(sa, 'warn')], backgroundColor: COLS.warn },
-        { label: 'Mendesak', data: [cnt(sp, 'bad'), cnt(sa, 'bad')], backgroundColor: COLS.bad }] },
+        { label: 'Aman', data: [cnt(sp, 'ok'), cnt(sa, 'ok'), cnt(sb, 'ok')], backgroundColor: COLS.ok },
+        { label: 'Perlu segera ditangani', data: [cnt(sp, 'warn'), cnt(sa, 'warn'), cnt(sb, 'warn')], backgroundColor: COLS.warn },
+        { label: 'Mendesak', data: [cnt(sp, 'bad'), cnt(sa, 'bad'), cnt(sb, 'bad')], backgroundColor: COLS.bad }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } },
       scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } } } });
 
@@ -277,12 +304,13 @@ function renderCharts() {
     return k >= 0 && k < 12 ? k + 1 : -1;
   };
   const bucket = list => { const a = Array(13).fill(0); list.forEach(x => { const k = slot(x.exp); if (k >= 0) a[k]++; }); return a; };
-  const bp = bucket(p3k), ba = bucket(apar);
-  show('chBulan', bp.concat(ba).some(n => n > 0));
+  const bp = bucket(p3k), ba = bucket(apar), bb = bucket(brg);
+  show('chBulan', bp.concat(ba, bb).some(n => n > 0));
   draw('chBulan', { type: 'bar',
     data: { labels, datasets: [
       { label: 'Kedaluwarsa P3K', data: bp, backgroundColor: '#2E9E57', borderRadius: 4 },
-      { label: 'Isi ulang APAR', data: ba, backgroundColor: '#1596D4', borderRadius: 4 }] },
+      { label: 'Isi ulang APAR', data: ba, backgroundColor: '#1596D4', borderRadius: 4 },
+      { label: 'Jatuh tempo perlengkapan lain', data: bb, backgroundColor: '#FFD21F', borderRadius: 4 }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } },
       scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } } } });
 }
@@ -290,6 +318,7 @@ function renderCharts() {
 const fail=e=>alert(DB.err(e));
 DB.watch('p3k',l=>{p3k=l;got.p=1;render();renderCharts();});
 DB.watch('apar',l=>{apar=l;got.a=1;render();renderCharts();});
+DB.watch('barang',l=>{brg=l;got.b=1;render();renderCharts();});
 
 $('demoBtn').onclick=async()=>{
   const P=(name,lokasi,qty,min,exp)=>({name,lokasi,qty,min,exp:plus(exp)});
@@ -306,7 +335,7 @@ const msg=t=>$('msg').textContent=t;
 const strip=({id,created,by,...r})=>r;
 $('exp').onclick=()=>{
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([JSON.stringify({p3k:p3k.map(strip),apar:apar.map(strip)},null,2)],{type:'application/json'}));
+  a.href=URL.createObjectURL(new Blob([JSON.stringify({p3k:p3k.map(strip),apar:apar.map(strip),barang:brg.map(strip)},null,2)],{type:'application/json'}));
   a.download='cadangan-k3.json';a.click();msg('Cadangan diunduh.');
 };
 $('imp').onclick=()=>$('file').click();
@@ -320,6 +349,7 @@ $('file').onchange=e=>{
     try{
       await DB.replaceAll('p3k',p3k,d.p3k.map(strip));
       await DB.replaceAll('apar',apar,d.apar.map(strip));
+      if(Array.isArray(d.barang))await DB.replaceAll('barang',brg,d.barang.map(strip));
       msg('Data berhasil dipulihkan.');
     }catch(err){msg(DB.err(err));}
   };
@@ -411,7 +441,7 @@ $('print').onclick = () => window.print();
 $('csv').onclick = () => {
   const { lp, la, lb } = view();
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-  const tg = i => i.exp ? (i.tipeTgl === 'kelayakan' ? 'Kelayakan ' : 'Kedaluwarsa ') + i.exp : '';
+  const tg = i => i.tipeTgl === 'kelayakan' ? 'Kelayakan: ' + (i.kondisi || 'Layak digunakan') : (i.exp ? 'Kedaluwarsa ' + i.exp : '');
   const rows = lp.map(([i, s]) => ['P3K', i.name, i.lokasi, 'Stok ' + i.qty + ', minimum ' + i.min, tg(i), s[0]])
     .concat(la.map(([i, s]) => ['APAR', i.kode, i.lokasi, i.jenis + ', ' + i.berat + ' kg, tekanan ' + i.tekanan, i.exp || '', s[0]]))
     .concat(lb.map(([i, s]) => [i.kategori || 'Lainnya', i.name, i.lokasi, [i.ukuran ? 'Ukuran ' + i.ukuran : '', i.ket, 'Stok ' + i.qty + ', minimum ' + i.min].filter(Boolean).join(', '), tg(i), s[0]]));
@@ -455,7 +485,9 @@ function layout() {
   $('berat').required = isA; $('exp').required = isA;
   show('wTipeTgl', !isA);
   const lay = $('tipeTgl').value === 'kelayakan';
-  $('expLbl').textContent = isA ? 'Jadwal isi ulang' : (lay ? 'Batas kelayakan (opsional)' : 'Tanggal kedaluwarsa (opsional)');
+  show('wKondisi', !isA && lay);
+  show('wExp', isA || !lay);
+  $('expLbl').textContent = isA ? 'Jadwal isi ulang' : 'Tanggal kedaluwarsa (opsional)';
 }
 $('kat').onchange = layout;
 $('tipeTgl').onchange = layout;
@@ -472,11 +504,13 @@ $('cancel').onclick = resetForm;
 $('f').onsubmit = e => {
   e.preventDefault();
   const id = $('id').value, kind = id ? $('eKind').value : ($('kat').value === 'P3K' ? 'p3k' : $('kat').value === 'APAR' ? 'apar' : 'barang');
-  const nama = $('nama').value.trim(), lokasi = $('lokasi').value.trim(), exp = $('exp').value;
+  const nama = $('nama').value.trim(), lokasi = $('lokasi').value.trim();
+  let exp = $('exp').value, kondisi = '';
+  if (kind !== 'apar' && $('tipeTgl').value === 'kelayakan') { kondisi = $('kondisi').value; exp = ''; }
   let d;
   if (kind === 'apar') d = { kode: nama, lokasi, jenis: $('jenis').value, berat: +$('berat').value || 0, tekanan: $('tekanan').value, exp, insp: $('insp').value };
   else {
-    d = { name: nama, lokasi, qty: Math.max(0, +$('qty').value || 0), min: Math.max(0, +$('min').value || 0), exp, tipeTgl: $('tipeTgl').value };
+    d = { name: nama, lokasi, qty: Math.max(0, +$('qty').value || 0), min: Math.max(0, +$('min').value || 0), exp, tipeTgl: $('tipeTgl').value, kondisi };
     if (kind === 'barang') {
       d.kategori = $('kat').value === 'Custom' ? $('katCustom').value.trim() : $('kat').value;
       d.ukuran = $('ukuran').value.trim(); d.ket = $('ket').value.trim();
@@ -537,7 +571,8 @@ $('rows').onclick = e => {
     $('kat').disabled = true; layout();
     $('nama').value = it.name || it.kode || ''; $('lokasi').value = it.lokasi || ''; $('exp').value = it.exp || '';
     if (c === 'apar') { $('jenis').value = it.jenis; $('berat').value = it.berat; $('tekanan').value = it.tekanan; $('insp').value = it.insp || ''; }
-    else { $('qty').value = it.qty; $('min').value = it.min; $('tipeTgl').value = it.tipeTgl || 'kedaluwarsa'; layout(); }
+    else { $('qty').value = it.qty; $('min').value = it.min; $('tipeTgl').value = it.tipeTgl || 'kedaluwarsa'; layout();
+      if (it.tipeTgl === 'kelayakan') $('kondisi').value = it.kondisi || 'Layak digunakan'; }
     if (c === 'barang') { $('ukuran').value = it.ukuran || ''; $('ket').value = it.ket || ''; }
     $('title').textContent = 'Ubah data'; $('save').textContent = 'Simpan perubahan'; $('cancel').classList.remove('hidden');
     $('nama').focus(); window.scrollTo({ top: 0, behavior: 'smooth' });
