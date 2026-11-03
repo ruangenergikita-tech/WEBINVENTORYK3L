@@ -61,7 +61,7 @@ tailwind.config = { theme: { extend: {
   <div class="relative max-w-6xl mx-auto px-4 pt-10 pb-28 flex flex-wrap items-end justify-between gap-6">
     <div class="max-w-xl">
       <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight">Dashboard Inventori K3</h1>
-      <p class="mt-2 text-sky-100/85 leading-relaxed">Pantau kesiapan P3K, APAR, baju, sepatu, dan perlengkapan lain di satu tempat, lengkap dengan grafik, peringatan, dan jadwal jatuh tempo.</p>
+      <p class="mt-2 text-sky-100/85 leading-relaxed">Pantau kesiapan P3K, APAR, dan setiap kategori yang Anda input (baju, sepatu, atau kategori custom). Setiap kategori punya kartu, status, dan grafiknya sendiri.</p>
     </div>
     <div class="rounded-2xl bg-white/10 ring-1 ring-white/20 backdrop-blur px-5 py-3">
       <div class="text-xs text-sky-100/80">Hari ini</div>
@@ -71,7 +71,7 @@ tailwind.config = { theme: { extend: {
 </section>
 
 <main class="max-w-6xl w-full mx-auto px-4 -mt-16 relative space-y-6">
-  <section id="cards" class="grid grid-cols-2 lg:grid-cols-5 gap-4"></section>
+  <section id="cards" class="grid grid-cols-2 lg:grid-cols-4 gap-4"></section>
 
   <section id="demoBox" class="hidden card p-5 flex flex-wrap items-center justify-between gap-3 border-l-4 border-sun">
     <div>
@@ -89,11 +89,8 @@ tailwind.config = { theme: { extend: {
       <div id="chP3kWrap" class="relative mt-3" style="height:260px"><canvas id="chP3k"></canvas></div>
       <p id="chP3kEmpty" class="hidden py-10 text-center text-sm text-slate-500">Belum ada data untuk ditampilkan.</p>
     </div>
-    <div class="card p-5 lg:col-span-2">
-      <div class="flex flex-wrap items-baseline justify-between gap-2"><h2 class="font-bold text-navy-900">Stok perlengkapan lain (baju, sepatu, custom)</h2><p class="text-xs text-slate-500">Warna mengikuti status. Abu-abu adalah stok minimum.</p></div>
-      <div id="chBrgWrap" class="relative mt-3" style="height:260px"><canvas id="chBrg"></canvas></div>
-      <p id="chBrgEmpty" class="hidden py-10 text-center text-sm text-slate-500">Belum ada data untuk ditampilkan.</p>
-    </div>
+    <!-- Grafik stok tiap kategori (Sepatu, Baju, Helm, dst.) dibuat otomatis di sini -->
+    <div id="chCats" class="contents"></div>
     <div class="card p-5">
       <div class="flex flex-wrap items-baseline justify-between gap-2"><h2 class="font-bold text-navy-900">Jumlah APAR per jenis media</h2></div>
       <div id="chJenisWrap" class="relative mt-3" style="height:260px"><canvas id="chJenis"></canvas></div>
@@ -105,7 +102,7 @@ tailwind.config = { theme: { extend: {
       <p id="chStatusEmpty" class="hidden py-10 text-center text-sm text-slate-500">Belum ada data untuk ditampilkan.</p>
     </div>
     <div class="card p-5 lg:col-span-2">
-      <div class="flex flex-wrap items-baseline justify-between gap-2"><h2 class="font-bold text-navy-900">Jadwal jatuh tempo 12 bulan ke depan</h2><p class="text-xs text-slate-500">Kedaluwarsa P3K, isi ulang APAR, dan jatuh tempo perlengkapan lain. Kolom Terlambat berisi yang sudah lewat.</p></div>
+      <div class="flex flex-wrap items-baseline justify-between gap-2"><h2 class="font-bold text-navy-900">Jadwal jatuh tempo 12 bulan ke depan</h2><p class="text-xs text-slate-500">Kedaluwarsa P3K, isi ulang APAR, dan jatuh tempo tiap kategori lain. Kolom Terlambat berisi yang sudah lewat.</p></div>
       <div id="chBulanWrap" class="relative mt-3" style="height:280px"><canvas id="chBulan"></canvas></div>
       <p id="chBulanEmpty" class="hidden py-10 text-center text-sm text-slate-500">Belum ada data untuk ditampilkan.</p>
     </div>
@@ -115,7 +112,7 @@ tailwind.config = { theme: { extend: {
   <section class="grid lg:grid-cols-5 gap-4">
     <div class="card p-5 lg:col-span-2">
       <h2 class="font-bold text-navy-900">Jatuh tempo 90 hari ke depan</h2>
-      <p class="text-sm text-slate-500 mb-2">Kedaluwarsa P3K, jadwal isi ulang APAR, dan jatuh tempo perlengkapan lain.</p>
+      <p class="text-sm text-slate-500 mb-2">Kedaluwarsa P3K, jadwal isi ulang APAR, dan jatuh tempo kategori lain.</p>
       <ul id="timeline" class="divide-y divide-slate-100"></ul>
     </div>
     <div class="card lg:col-span-3 overflow-hidden">
@@ -126,7 +123,7 @@ tailwind.config = { theme: { extend: {
       <div class="overflow-x-auto">
         <table class="w-full text-sm min-w-[520px]">
           <thead class="bg-slate-50 text-left text-slate-500">
-            <tr><th class="px-5 py-2.5 font-semibold">Jenis</th><th class="px-3 py-2.5 font-semibold">Nama atau kode</th><th class="px-3 py-2.5 font-semibold">Lokasi</th><th class="px-3 py-2.5 font-semibold">Masalah</th></tr>
+            <tr><th class="px-5 py-2.5 font-semibold">Kategori</th><th class="px-3 py-2.5 font-semibold">Nama atau kode</th><th class="px-3 py-2.5 font-semibold">Lokasi</th><th class="px-3 py-2.5 font-semibold">Masalah</th></tr>
           </thead>
           <tbody id="alerts" class="divide-y divide-slate-100"></tbody>
         </table>
@@ -152,6 +149,6 @@ tailwind.config = { theme: { extend: {
   <span>Data tersimpan di Firebase dan sinkron di semua perangkat.</span>
 </footer>
 
-<script type="module" src="app.js?v=20261102"></script>
+<script type="module" src="app.js?v=20261103"></script>
 </body>
 </html>

@@ -19,7 +19,7 @@ const FIREBASE_CONFIG = {
 };
 
 /* =====================================================================
-   2. FUNGSI BANTU DAN ATURAN STATUS (P3K dan APAR)
+   2. FUNGSI BANTU DAN ATURAN STATUS
    ===================================================================== */
 const today=new Date();today.setHours(0,0,0,0);
 const $=id=>document.getElementById(id);
@@ -62,6 +62,39 @@ function heroStats(sts){
 }
 function matchFilter(s,f){return f==='all'||(f==='alert'?s[1]!=='ok':s[1]==='ok');}
 const FILTER='<select id="flt" class="inp !w-auto" aria-label="Filter status"><option value="all">Semua status</option><option value="alert">Perlu tindakan</option><option value="ok">Aman</option></select>';
+
+// ---- Kategori perlengkapan (koleksi "barang") ----
+// Setiap kategori (Baju, Sepatu, Helm, dst.) mendapat laporan, kartu, dan grafik sendiri.
+const FIXED = ['Baju', 'Sepatu'];
+const catKey = k => String(k || 'Lainnya').trim().toLowerCase();
+const catLabel = k => { const s = String(k || '').trim() || 'Lainnya'; return s.charAt(0).toUpperCase() + s.slice(1); };
+// Kelompokkan item per kategori. Penulisan berbeda huruf besar-kecil (helm, Helm) digabung jadi satu.
+function groupCats(list) {
+  const names = new Map(FIXED.map(n => [catKey(n), n]));
+  list.forEach(i => { const k = catKey(i.kategori); if (!names.has(k)) names.set(k, catLabel(i.kategori)); });
+  const g = new Map();
+  list.forEach(i => { const k = catKey(i.kategori); if (!g.has(k)) g.set(k, { key: k, name: names.get(k), items: [] }); g.get(k).items.push(i); });
+  return [...g.values()].sort((a, b) => a.name.localeCompare(b.name, 'id')).map((x, gi) => ({ ...x, gi }));
+}
+// Warna tiap kategori (diulang jika kategorinya banyak)
+const CAT_STYLE = [
+  { b: 'border-violet-500', i: 'bg-violet-50 text-violet-600', h: '#7C3AED' },
+  { b: 'border-teal-500', i: 'bg-teal-50 text-teal-600', h: '#14B8A6' },
+  { b: 'border-rose-500', i: 'bg-rose-50 text-rose-600', h: '#F43F5E' },
+  { b: 'border-indigo-500', i: 'bg-indigo-50 text-indigo-600', h: '#6366F1' },
+  { b: 'border-orange-500', i: 'bg-orange-50 text-orange-600', h: '#F97316' },
+  { b: 'border-lime-500', i: 'bg-lime-50 text-lime-600', h: '#84CC16' }
+];
+const catStyle = gi => CAT_STYLE[gi % CAT_STYLE.length];
+// Ganti isi pilihan <select> hanya jika daftarnya berubah, dan pertahankan pilihan yang aktif
+function setOptions(sel, opts) {
+  const sig = JSON.stringify(opts);
+  if (sel._sig === sig) return;
+  const cur = sel.value;
+  sel.innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join('');
+  sel._sig = sig;
+  sel.value = opts.some(o => o[0] === cur) ? cur : opts[0][0];
+}
 
 /* =====================================================================
    3. FIREBASE: LOGIN, LOGOUT, DAN DATA
@@ -186,24 +219,25 @@ function breakdown(title,href,sts){
   const seg=(k,col)=>c[k]?`<div class="${col}" style="width:${c[k]/t*100}%"></div>`:'';
   const row=(col,l,n)=>`<div class="flex items-center justify-between text-sm"><span class="flex items-center gap-2 text-slate-600"><span class="h-2.5 w-2.5 rounded-full ${col}"></span>${l}</span><b>${n}</b></div>`;
   return `<div class="card p-5">
-    <div class="flex items-center justify-between mb-4"><h2 class="font-bold text-navy-900">${title}</h2><a href="${href}" class="text-sm font-semibold text-pln hover:underline">Kelola</a></div>
+    <div class="flex items-center justify-between mb-4"><h2 class="font-bold text-navy-900">${esc(title)}</h2><a href="${href}" class="text-sm font-semibold text-pln hover:underline">Kelola</a></div>
     <div class="flex h-3 rounded-full overflow-hidden bg-slate-100 mb-4">${seg('ok','bg-emerald-500')}${seg('warn','bg-amber-400')}${seg('bad','bg-red-500')}</div>
     <div class="space-y-2">${row('bg-emerald-500','Aman',c.ok)}${row('bg-amber-400','Perlu segera ditangani',c.warn)}${row('bg-red-500','Mendesak',c.bad)}</div></div>`;
 }
 
 let p3k=[],apar=[],brg=[],got={p:0,a:0,b:0};
 function render(){
+  const groups=groupCats(brg);
   const sp=p3k.map(i=>({t:'P3K',href:'Data.html',n:i.name,l:i.lokasi,s:p3kStatus(i),exp:i.exp}));
   const sa=apar.map(i=>({t:'APAR',href:'Data.html',n:i.kode,l:i.lokasi,s:aparStatus(i),exp:i.exp}));
-  const sb=brg.map(i=>({t:i.kategori||'Lainnya',href:'Data.html',n:i.name+(i.ukuran?' ('+i.ukuran+')':''),l:i.lokasi,s:p3kStatus(i),exp:i.exp}));
-  const all=sp.concat(sa,sb),bad=all.filter(x=>x.s[1]!=='ok');
+  const gr=groups.map(g=>({g,rows:g.items.map(i=>({t:g.name,href:'Data.html',n:i.name+(i.ukuran?' ('+i.ukuran+')':''),l:i.lokasi,s:p3kStatus(i),exp:i.exp}))}));
+  const all=sp.concat(sa,...gr.map(x=>x.rows)),bad=all.filter(x=>x.s[1]!=='ok');
   $('demoBox').classList.toggle('hidden',!(got.p&&got.a&&got.b)||all.length>0);
 
-  const card=(l,v,ic,top,bg)=>`<div class="card p-4 border-t-4 ${top}"><div class="flex items-center justify-between"><div class="text-sm text-slate-500">${l}</div><div class="rounded-xl p-2 ${bg}">${svg(ic)}</div></div><div class="mt-2 text-3xl font-extrabold text-navy-900">${v}</div></div>`;
+  const card=(l,v,ic,top,bg)=>`<div class="card p-4 border-t-4 ${top}"><div class="flex items-center justify-between"><div class="text-sm text-slate-500">${esc(l)}</div><div class="rounded-xl p-2 ${bg}">${svg(ic)}</div></div><div class="mt-2 text-3xl font-extrabold text-navy-900">${v}</div></div>`;
   const soon=all.filter(x=>x.exp&&daysLeft(x.exp)>=0&&daysLeft(x.exp)<=30).length;
   $('cards').innerHTML=card('Item P3K',p3k.length,ICON.plus,'border-hsse','bg-emerald-50 text-hsse')
     +card('Unit APAR',apar.length,ICON.fire,'border-pln','bg-sky-50 text-pln')
-    +card('Perlengkapan lain',brg.length,ICON.box,'border-violet-500','bg-violet-50 text-violet-600')
+    +gr.map(x=>card('Item '+x.g.name,x.g.items.length,ICON.box,catStyle(x.g.gi).b,catStyle(x.g.gi).i)).join('')
     +card('Perlu tindakan',bad.length,ICON.warn,'border-red-500','bg-red-50 text-red-600')
     +card('Jatuh tempo 30 hari',soon,ICON.clock,'border-sun','bg-yellow-50 text-yellow-600');
 
@@ -214,18 +248,19 @@ function render(){
     <h2 class="font-bold text-navy-900 mb-3 self-start">Tingkat kesiapan</h2>
     <div class="relative"><svg viewBox="0 0 120 120" class="h-40 w-40 -rotate-90"><circle cx="60" cy="60" r="52" fill="none" stroke="#E2E8F0" stroke-width="12"/><circle cx="60" cy="60" r="52" fill="none" stroke="${col}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${pct===null?0:C*pct/100} ${C}"/></svg>
     <div class="absolute inset-0 flex flex-col items-center justify-center"><span class="text-3xl font-extrabold text-navy-900">${pct===null?'-':pct+'%'}</span><span class="text-xs text-slate-500">item dalam kondisi aman</span></div></div></div>`;
-  $('stats').innerHTML=ring+breakdown('Status P3K','Tambah.html?jenis=p3k',sp.map(x=>x.s))+breakdown('Status APAR','Tambah.html?jenis=apar',sa.map(x=>x.s))+breakdown('Status perlengkapan lain','Tambah.html',sb.map(x=>x.s));
+  $('stats').innerHTML=ring+breakdown('Status P3K','Tambah.html?jenis=p3k',sp.map(x=>x.s))+breakdown('Status APAR','Tambah.html?jenis=apar',sa.map(x=>x.s))
+    +gr.map(x=>breakdown('Status '+x.g.name,'Tambah.html?jenis='+encodeURIComponent(x.g.name.toLowerCase()),x.rows.map(r=>r.s))).join('');
 
   const up=all.filter(x=>x.exp&&daysLeft(x.exp)>=0&&daysLeft(x.exp)<=90).sort((a,b)=>a.exp.localeCompare(b.exp)).slice(0,7);
   $('timeline').innerHTML=up.length?up.map(x=>{const d=new Date(x.exp+'T00:00:00'),n=daysLeft(x.exp);
     return `<li class="flex items-center gap-3 py-3"><div class="w-12 shrink-0 rounded-xl bg-navy-900 py-1.5 text-center text-white leading-tight"><div class="text-lg font-extrabold">${d.getDate()}</div><div class="text-[11px] text-sky-200">${d.toLocaleDateString('id-ID',{month:'short'})}</div></div>
-    <div class="min-w-0 flex-1"><div class="truncate font-semibold text-slate-900">${esc(x.n)}</div><div class="truncate text-xs text-slate-500">${x.t}, ${esc(x.l)}</div></div>
+    <div class="min-w-0 flex-1"><div class="truncate font-semibold text-slate-900">${esc(x.n)}</div><div class="truncate text-xs text-slate-500">${esc(x.t)}, ${esc(x.l)}</div></div>
     <span class="shrink-0 text-xs font-semibold ${n<=30?'text-amber-700':'text-slate-500'}">${n===0?'Hari ini':n+' hari lagi'}</span></li>`}).join('')
     :'<li class="py-8 text-center text-sm text-slate-500">Tidak ada jadwal jatuh tempo dalam 90 hari ke depan.</li>';
 
   bad.sort((a,b)=>(a.s[1]==='bad'?0:1)-(b.s[1]==='bad'?0:1));
   $('alertCount').textContent=bad.length+' temuan';
-  $('alerts').innerHTML=bad.length?bad.map(x=>`<tr class="hover:bg-slate-50/70"><td class="px-5 py-2.5"><a href="${x.href}" class="font-semibold text-pln hover:underline">${x.t}</a></td><td class="px-3 py-2.5 font-medium">${esc(x.n)}</td><td class="px-3 py-2.5 text-slate-600">${esc(x.l)}</td><td class="px-3 py-2.5">${pill(x.s)}</td></tr>`).join('')
+  $('alerts').innerHTML=bad.length?bad.map(x=>`<tr class="hover:bg-slate-50/70"><td class="px-5 py-2.5"><a href="${x.href}" class="font-semibold text-pln hover:underline">${esc(x.t)}</a></td><td class="px-3 py-2.5 font-medium">${esc(x.n)}</td><td class="px-3 py-2.5 text-slate-600">${esc(x.l)}</td><td class="px-3 py-2.5">${pill(x.s)}</td></tr>`).join('')
     :`<tr><td colspan="4" class="px-5 py-10 text-center text-slate-500">${all.length?'Semua item dalam kondisi aman.':'Belum ada data untuk diperiksa.'}</td></tr>`;
 }
 
@@ -233,6 +268,7 @@ function render(){
 
 const COLS = { ok: '#2E9E57', warn: '#F59E0B', bad: '#E1251B' };
 const charts = {};
+const catCharts = [];
 function renderCharts() {
   if (!window.Chart) { $('chartsMsg').classList.remove('hidden'); return; }
   Chart.defaults.font.family = '"Plus Jakarta Sans", system-ui, sans-serif';
@@ -243,7 +279,11 @@ function renderCharts() {
     if (!has && charts[id]) { charts[id].destroy(); delete charts[id]; }
   };
   const draw = (id, cfg) => { if (charts[id]) charts[id].destroy(); charts[id] = new Chart($(id), cfg); };
-  const sp = p3k.map(i => [i, p3kStatus(i)]), sa = apar.map(i => [i, aparStatus(i)]), sb = brg.map(i => [i, p3kStatus(i)]);
+  const groups = groupCats(brg);
+  const sp = p3k.map(i => [i, p3kStatus(i)]), sa = apar.map(i => [i, aparStatus(i)]);
+  const sg = groups.map(g => ({ g, sts: g.items.map(i => [i, p3kStatus(i)]) }));
+  const stockOpts = { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } };
 
   // 1. Stok semua barang P3K
   show('chP3k', sp.length > 0);
@@ -254,24 +294,20 @@ function renderCharts() {
         datasets: [
           { label: 'Stok', data: sp.map(([i]) => i.qty), backgroundColor: sp.map(([, s]) => COLS[s[1]]), borderRadius: 4 },
           { label: 'Stok minimum', data: sp.map(([i]) => i.min), backgroundColor: '#CBD5E1', borderRadius: 4 }] },
-      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } } });
+      options: stockOpts });
   }
 
-  // 1b. Stok perlengkapan lain (Baju, Sepatu, Custom)
-  show('chBrg', sb.length > 0);
-  if (sb.length) {
-    $('chBrgWrap').style.height = Math.max(220, sb.length * 38 + 80) + 'px';
-    draw('chBrg', { type: 'bar',
-      data: { labels: sb.map(([i]) => (i.kategori || 'Lainnya') + ': ' + i.name + (i.ukuran ? ' ' + i.ukuran : '') + ' (' + i.lokasi + ')'),
-        datasets: [
-          { label: 'Stok', data: sb.map(([i]) => i.qty), backgroundColor: sb.map(([, s]) => COLS[s[1]]), borderRadius: 4 },
-          { label: 'Stok minimum', data: sb.map(([i]) => i.min), backgroundColor: '#CBD5E1', borderRadius: 4 }] },
-      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } } });
-  }
+  // 1b. Grafik stok tersendiri untuk setiap kategori (Sepatu, Baju, Helm, dst.)
+  catCharts.forEach(c => c.destroy()); catCharts.length = 0;
+  $('chCats').innerHTML = sg.map((x, n) => `<div class="card p-5 lg:col-span-2">
+      <div class="flex flex-wrap items-baseline justify-between gap-2"><h2 class="font-bold text-navy-900">Stok ${esc(x.g.name)}</h2><p class="text-xs text-slate-500">Warna mengikuti status. Abu-abu adalah stok minimum.</p></div>
+      <div class="relative mt-3" style="height:${Math.max(220, x.sts.length * 38 + 80)}px"><canvas id="chCat${n}"></canvas></div></div>`).join('');
+  sg.forEach((x, n) => catCharts.push(new Chart($('chCat' + n), { type: 'bar',
+    data: { labels: x.sts.map(([i]) => i.name + (i.ukuran ? ' ' + i.ukuran : '') + ' (' + i.lokasi + ')'),
+      datasets: [
+        { label: 'Stok', data: x.sts.map(([i]) => i.qty), backgroundColor: x.sts.map(([, s]) => COLS[s[1]]), borderRadius: 4 },
+        { label: 'Stok minimum', data: x.sts.map(([i]) => i.min), backgroundColor: '#CBD5E1', borderRadius: 4 }] },
+    options: stockOpts })));
 
   // 2. APAR per jenis media
   const byJenis = {}; apar.forEach(i => { byJenis[i.jenis] = (byJenis[i.jenis] || 0) + 1; });
@@ -281,15 +317,17 @@ function renderCharts() {
     data: { labels: jl, datasets: [{ data: jl.map(k => byJenis[k]), backgroundColor: ['#1596D4', '#2E9E57', '#FFD21F', '#E1251B', '#0E5384', '#94A3B8'], borderWidth: 2, borderColor: '#fff' }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
 
-  // 3. Status seluruh barang
+  // 3. Status seluruh barang, satu batang per kategori
   const cnt = (list, k) => list.filter(([, s]) => s[1] === k).length;
-  show('chStatus', sp.length + sa.length + sb.length > 0);
-  if (sp.length + sa.length + sb.length) draw('chStatus', { type: 'bar',
-    data: { labels: ['P3K', 'APAR', 'Lainnya'],
+  const sets = [{ n: 'P3K', l: sp }, { n: 'APAR', l: sa }].concat(sg.map(x => ({ n: x.g.name, l: x.sts })));
+  const total = sets.reduce((s, x) => s + x.l.length, 0);
+  show('chStatus', total > 0);
+  if (total) draw('chStatus', { type: 'bar',
+    data: { labels: sets.map(x => x.n),
       datasets: [
-        { label: 'Aman', data: [cnt(sp, 'ok'), cnt(sa, 'ok'), cnt(sb, 'ok')], backgroundColor: COLS.ok },
-        { label: 'Perlu segera ditangani', data: [cnt(sp, 'warn'), cnt(sa, 'warn'), cnt(sb, 'warn')], backgroundColor: COLS.warn },
-        { label: 'Mendesak', data: [cnt(sp, 'bad'), cnt(sa, 'bad'), cnt(sb, 'bad')], backgroundColor: COLS.bad }] },
+        { label: 'Aman', data: sets.map(x => cnt(x.l, 'ok')), backgroundColor: COLS.ok },
+        { label: 'Perlu segera ditangani', data: sets.map(x => cnt(x.l, 'warn')), backgroundColor: COLS.warn },
+        { label: 'Mendesak', data: sets.map(x => cnt(x.l, 'bad')), backgroundColor: COLS.bad }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } },
       scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } } } });
 
@@ -304,13 +342,12 @@ function renderCharts() {
     return k >= 0 && k < 12 ? k + 1 : -1;
   };
   const bucket = list => { const a = Array(13).fill(0); list.forEach(x => { const k = slot(x.exp); if (k >= 0) a[k]++; }); return a; };
-  const bp = bucket(p3k), ba = bucket(apar), bb = bucket(brg);
-  show('chBulan', bp.concat(ba, bb).some(n => n > 0));
-  draw('chBulan', { type: 'bar',
-    data: { labels, datasets: [
-      { label: 'Kedaluwarsa P3K', data: bp, backgroundColor: '#2E9E57', borderRadius: 4 },
-      { label: 'Isi ulang APAR', data: ba, backgroundColor: '#1596D4', borderRadius: 4 },
-      { label: 'Jatuh tempo perlengkapan lain', data: bb, backgroundColor: '#FFD21F', borderRadius: 4 }] },
+  const ds = [
+    { label: 'Kedaluwarsa P3K', data: bucket(p3k), backgroundColor: '#2E9E57', borderRadius: 4 },
+    { label: 'Isi ulang APAR', data: bucket(apar), backgroundColor: '#1596D4', borderRadius: 4 }
+  ].concat(groups.map(g => ({ label: 'Jatuh tempo ' + g.name, data: bucket(g.items), backgroundColor: catStyle(g.gi).h, borderRadius: 4 })));
+  show('chBulan', ds.some(d => d.data.some(n => n > 0)));
+  draw('chBulan', { type: 'bar', data: { labels, datasets: ds },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } },
       scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } } } });
 }
@@ -372,44 +409,48 @@ render();
 }
 
 
-// ---- Data.html (laporan, hanya baca) ----
+// ---- Data.html (laporan, hanya baca): satu laporan untuk tiap kategori ----
 function initData(DB) {
 const byNew = (a, b) => (b.created || 0) - (a.created || 0);
-const FIXED = ['Baju', 'Sepatu'];
 let p3k = [], apar = [], brg = [], loaded = { p: false, a: false, b: false };
 $('todayTxt').textContent = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 DB.watch('p3k', l => { p3k = l.sort(byNew); loaded.p = true; render(); });
 DB.watch('apar', l => { apar = l.sort(byNew); loaded.a = true; render(); });
 DB.watch('barang', l => { brg = l.sort(byNew); loaded.b = true; render(); });
 
-const brgMatch = (i, t) => t === 'all' || (t === 'Lainnya' ? !FIXED.includes(i.kategori) : i.kategori === t);
-
 // Data setelah pencarian dan filter diterapkan
 function view() {
   const q = $('q').value.trim().toLowerCase(), f = $('flt').value, t = $('tipe').value;
-  const sp = p3k.map(i => [i, p3kStatus(i)]), sa = apar.map(i => [i, aparStatus(i)]), sb = brg.map(i => [i, p3kStatus(i)]);
+  const sp = p3k.map(i => [i, p3kStatus(i)]), sa = apar.map(i => [i, aparStatus(i)]);
   const lp = (t === 'all' || t === 'P3K') ? sp.filter(([i, s]) => (!q || (i.name + ' ' + i.lokasi).toLowerCase().includes(q)) && matchFilter(s, f)) : [];
   const la = (t === 'all' || t === 'APAR') ? sa.filter(([i, s]) => (!q || (i.kode + ' ' + i.lokasi).toLowerCase().includes(q)) && matchFilter(s, f)) : [];
-  const lb = sb.filter(([i, s]) => brgMatch(i, t) && (!q || ((i.kategori || '') + ' ' + i.name + ' ' + i.lokasi + ' ' + (i.ukuran || '') + ' ' + (i.ket || '')).toLowerCase().includes(q)) && matchFilter(s, f));
-  return { sp, sa, sb, lp, la, lb, t };
+  const groups = groupCats(brg).map(g => {
+    const sts = g.items.map(i => [i, p3kStatus(i)]);
+    const list = (t === 'all' || t === g.key)
+      ? sts.filter(([i, s]) => (!q || (g.name + ' ' + i.name + ' ' + i.lokasi + ' ' + (i.ukuran || '') + ' ' + (i.ket || '')).toLowerCase().includes(q)) && matchFilter(s, f)) : [];
+    return { ...g, sts, list };
+  });
+  return { sp, sa, lp, la, groups, t };
 }
 const empty = (cols, total, ready) => `<tr><td colspan="${cols}" class="px-5 py-12 text-center text-slate-500">${!ready ? 'Memuat data...' : total ? 'Tidak ada data yang cocok dengan pencarian atau filter.' : 'Belum ada data. Tambahkan lewat halaman Tambah.'}</td></tr>`;
 
 function render() {
-  const { sp, sa, sb, lp, la, lb, t } = view();
-  const all = sp.concat(sa, sb);
-  $('sP3k').textContent = sp.length;
-  $('sApar').textContent = sa.length;
-  $('sBrg').textContent = sb.length;
-  $('sAlert').textContent = all.filter(x => x[1][1] !== 'ok').length;
-  $('sOk').textContent = all.filter(x => x[1][1] === 'ok').length;
+  // pilihan filter kategori mengikuti kategori yang punya data
+  const tSel = $('tipe');
+  setOptions(tSel, [['all', 'Semua kategori'], ['P3K', 'Hanya P3K'], ['APAR', 'Hanya APAR']].concat(groupCats(brg).map(g => [g.key, 'Hanya ' + g.name])));
+  const { sp, sa, lp, la, groups, t } = view();
+  const all = sp.concat(sa, ...groups.map(g => g.sts));
+
+  const mk = (label, val, border) => `<div class="card p-4 border-t-4 ${border}"><div class="text-sm text-slate-500">${esc(label)}</div><div class="mt-2 text-3xl font-extrabold text-navy-900">${val}</div></div>`;
+  $('sumCards').innerHTML = mk('Item P3K', sp.length, 'border-hsse') + mk('Unit APAR', sa.length, 'border-pln')
+    + groups.map(g => mk('Item ' + g.name, g.items.length, catStyle(g.gi).b)).join('')
+    + mk('Perlu tindakan', all.filter(x => x[1][1] !== 'ok').length, 'border-red-500')
+    + mk('Aman', all.filter(x => x[1][1] === 'ok').length, 'border-emerald-500');
 
   $('secP3k').classList.toggle('hidden', !(t === 'all' || t === 'P3K'));
   $('secApar').classList.toggle('hidden', !(t === 'all' || t === 'APAR'));
-  $('secBrg').classList.toggle('hidden', t === 'P3K' || t === 'APAR');
   $('cP3k').textContent = lp.length + ' dari ' + sp.length + ' item';
   $('cApar').textContent = la.length + ' dari ' + sa.length + ' unit';
-  $('cBrg').textContent = lb.length + ' dari ' + sb.length + ' item';
 
   $('rowsP3k').innerHTML = lp.length ? lp.map(([i, s]) => `<tr class="hover:bg-slate-50/70">
     <td class="px-5 py-3 font-semibold text-slate-900">${esc(i.name)}</td>
@@ -426,25 +467,44 @@ function render() {
     <td class="px-3 py-3 text-slate-700">${fmt(i.exp)}<div class="text-xs text-slate-400">Inspeksi: ${fmt(i.insp)}</div></td>
     <td class="px-3 py-3">${pill(s)}</td></tr>`).join('') : empty(6, sa.length, loaded.a);
 
-  $('rowsBrg').innerHTML = lb.length ? lb.map(([i, s]) => `<tr class="hover:bg-slate-50/70">
-    <td class="px-5 py-3"><span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">${esc(i.kategori || 'Lainnya')}</span></td>
-    <td class="px-3 py-3 font-semibold text-slate-900">${esc(i.name)}</td>
-    <td class="px-3 py-3 text-slate-600">${esc(i.lokasi)}</td>
-    <td class="px-3 py-3 text-slate-600">${esc([i.ukuran ? 'Ukuran ' + i.ukuran : '', i.ket].filter(Boolean).join(', ') || '-')}</td>
-    <td class="px-3 py-3 text-center"><b>${i.qty}</b> <span class="text-xs text-slate-400">min. ${i.min}</span></td>
-    <td class="px-3 py-3 text-slate-600">${tgl(i)}</td>
-    <td class="px-3 py-3">${pill(s)}</td></tr>`).join('') : empty(7, sb.length, loaded.b);
+  // satu bagian laporan untuk setiap kategori
+  $('catSections').innerHTML = groups.filter(g => t === 'all' || t === g.key).map(g => `<section class="card overflow-hidden">
+    <div class="p-4 md:p-5 flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-100">
+      <h2 class="text-lg font-bold text-navy-900">Laporan ${esc(g.name)}</h2>
+      <span class="text-sm text-slate-500">${g.list.length} dari ${g.items.length} item</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm min-w-[720px]">
+        <thead class="bg-slate-50 text-left text-slate-500">
+          <tr>
+            <th class="px-5 py-3 font-semibold">Item</th>
+            <th class="px-3 py-3 font-semibold">Lokasi</th>
+            <th class="px-3 py-3 font-semibold">Ukuran dan keterangan</th>
+            <th class="px-3 py-3 font-semibold text-center">Stok</th>
+            <th class="px-3 py-3 font-semibold">Kedaluwarsa / kelayakan</th>
+            <th class="px-3 py-3 font-semibold">Status</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">${g.list.length ? g.list.map(([i, s]) => `<tr class="hover:bg-slate-50/70">
+          <td class="px-5 py-3 font-semibold text-slate-900">${esc(i.name)}</td>
+          <td class="px-3 py-3 text-slate-600">${esc(i.lokasi)}</td>
+          <td class="px-3 py-3 text-slate-600">${esc([i.ukuran ? 'Ukuran ' + i.ukuran : '', i.ket].filter(Boolean).join(', ') || '-')}</td>
+          <td class="px-3 py-3 text-center"><b>${i.qty}</b> <span class="text-xs text-slate-400">min. ${i.min}</span></td>
+          <td class="px-3 py-3 text-slate-600">${tgl(i)}</td>
+          <td class="px-3 py-3">${pill(s)}</td></tr>`).join('') : empty(6, g.items.length, true)}</tbody>
+      </table>
+    </div></section>`).join('');
 }
 
 $('q').oninput = render; $('flt').onchange = render; $('tipe').onchange = render;
 $('print').onclick = () => window.print();
 $('csv').onclick = () => {
-  const { lp, la, lb } = view();
+  const { lp, la, groups } = view();
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
   const tg = i => i.tipeTgl === 'kelayakan' ? 'Kelayakan: ' + (i.kondisi || 'Layak digunakan') : (i.exp ? 'Kedaluwarsa ' + i.exp : '');
   const rows = lp.map(([i, s]) => ['P3K', i.name, i.lokasi, 'Stok ' + i.qty + ', minimum ' + i.min, tg(i), s[0]])
     .concat(la.map(([i, s]) => ['APAR', i.kode, i.lokasi, i.jenis + ', ' + i.berat + ' kg, tekanan ' + i.tekanan, i.exp || '', s[0]]))
-    .concat(lb.map(([i, s]) => [i.kategori || 'Lainnya', i.name, i.lokasi, [i.ukuran ? 'Ukuran ' + i.ukuran : '', i.ket, 'Stok ' + i.qty + ', minimum ' + i.min].filter(Boolean).join(', '), tg(i), s[0]]));
+    .concat(...groups.map(g => g.list.map(([i, s]) => [g.name, i.name, i.lokasi, [i.ukuran ? 'Ukuran ' + i.ukuran : '', i.ket, 'Stok ' + i.qty + ', minimum ' + i.min].filter(Boolean).join(', '), tg(i), s[0]])));
   const csv = [['Kategori', 'Nama atau kode', 'Lokasi', 'Detail', 'Jatuh tempo', 'Status']].concat(rows).map(r => r.map(q).join(',')).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' }));
@@ -459,13 +519,20 @@ render();
 function initTambah(DB) {
 const byNew = (a, b) => (b.created || 0) - (a.created || 0);
 const fail = e => alert(DB.err(e));
-const FIXED = ['Baju', 'Sepatu'];
 let p3k = [], apar = [], brg = [], ready = { p: false, a: false, b: false };
 const flash = t => { const el = $('msg'); el.textContent = t; clearTimeout(el._t); el._t = setTimeout(() => { el.textContent = ''; }, 3000); };
 
 DB.watch('p3k', l => { p3k = l.sort(byNew); ready.p = true; render(); });
 DB.watch('apar', l => { apar = l.sort(byNew); ready.a = true; render(); });
 DB.watch('barang', l => { brg = l.sort(byNew); ready.b = true; render(); });
+
+// Nama kategori yang sudah ada dipakai apa adanya (helm dan Helm dianggap sama)
+const canonCat = n => {
+  const k = catKey(n), f = FIXED.find(x => catKey(x) === k);
+  if (f) return f;
+  const ex = groupCats(brg).find(g => g.key === k);
+  return ex ? ex.name : catLabel(n);
+};
 
 // ---- Isian formulir menyesuaikan kategori ----
 const PH = { P3K: ['Nama item', 'Contoh: Plester luka', 'Lokasi kotak P3K', 'Contoh: Lobi lantai 1'],
@@ -476,7 +543,7 @@ const PH = { P3K: ['Nama item', 'Contoh: Plester luka', 'Lokasi kotak P3K', 'Con
 const show = (id, on) => $(id).classList.toggle('hidden', !on);
 function layout() {
   const k = $('kat').value, isA = k === 'APAR', isG = !isA && k !== 'P3K';
-  const p = PH[k];
+  const p = PH[k] || PH.Custom;
   $('namaLbl').textContent = p[0]; $('nama').placeholder = p[1]; $('lokasiLbl').textContent = p[2]; $('lokasi').placeholder = p[3];
   show('wCustom', k === 'Custom'); $('katCustom').required = k === 'Custom';
   show('wQty', !isA); show('wMin', !isA);
@@ -503,7 +570,11 @@ $('cancel').onclick = resetForm;
 
 $('f').onsubmit = e => {
   e.preventDefault();
-  const id = $('id').value, kind = id ? $('eKind').value : ($('kat').value === 'P3K' ? 'p3k' : $('kat').value === 'APAR' ? 'apar' : 'barang');
+  const sel = $('kat').value;
+  const id = $('id').value, kind = id ? $('eKind').value : (sel === 'P3K' ? 'p3k' : sel === 'APAR' ? 'apar' : 'barang');
+  if (!id && sel === 'Custom' && ['p3k', 'apar'].includes(catKey($('katCustom').value))) {
+    flash('P3K dan APAR sudah ada di daftar kategori. Pilih dari daftar, bukan Custom.'); return;
+  }
   const nama = $('nama').value.trim(), lokasi = $('lokasi').value.trim();
   let exp = $('exp').value, kondisi = '';
   if (kind !== 'apar' && $('tipeTgl').value === 'kelayakan') { kondisi = $('kondisi').value; exp = ''; }
@@ -512,7 +583,7 @@ $('f').onsubmit = e => {
   else {
     d = { name: nama, lokasi, qty: Math.max(0, +$('qty').value || 0), min: Math.max(0, +$('min').value || 0), exp, tipeTgl: $('tipeTgl').value, kondisi };
     if (kind === 'barang') {
-      d.kategori = $('kat').value === 'Custom' ? $('katCustom').value.trim() : $('kat').value;
+      d.kategori = canonCat(sel === 'Custom' ? $('katCustom').value : sel);
       d.ukuran = $('ukuran').value.trim(); d.ket = $('ket').value.trim();
     }
   }
@@ -521,19 +592,30 @@ $('f').onsubmit = e => {
 
 // ---- Daftar gabungan ----
 function items() {
+  const gm = new Map(groupCats(brg).map(g => [g.key, g.name]));
   return p3k.map(i => ({ c: 'p3k', kat: 'P3K', i, s: p3kStatus(i) }))
     .concat(apar.map(i => ({ c: 'apar', kat: 'APAR', i, s: aparStatus(i) })))
-    .concat(brg.map(i => ({ c: 'barang', kat: i.kategori || 'Lainnya', i, s: p3kStatus(i) })))
+    .concat(brg.map(i => ({ c: 'barang', kat: gm.get(catKey(i.kategori)), i, s: p3kStatus(i) })))
     .sort((a, b) => byNew(a.i, b.i));
 }
+let wantKat = (new URLSearchParams(location.search).get('jenis') || '').toLowerCase();   // contoh Tambah.html?jenis=apar
 function render() {
   const all = items();
   heroStats(all.map(x => x.s));
-  // saran nama kategori custom yang sudah pernah dipakai
-  $('katList').innerHTML = [...new Set(brg.map(i => i.kategori).filter(k => k && !FIXED.includes(k)))].map(k => `<option value="${esc(k)}">`).join('');
+  const groups = groupCats(brg);
+  // pilihan kategori di formulir: P3K, APAR, Baju, Sepatu, kategori custom yang sudah ada, lalu Custom
+  const extra = groups.filter(g => !FIXED.some(f => catKey(f) === g.key)).map(g => [g.name, g.name]);
+  setOptions($('kat'), [['P3K', 'P3K'], ['APAR', 'APAR'], ['Baju', 'Baju'], ['Sepatu', 'Sepatu']].concat(extra, [['Custom', 'Custom (isi sendiri)']]));
+  // pilihan filter daftar: hanya kategori yang punya data
+  setOptions($('fKat'), [['all', 'Semua kategori'], ['P3K', 'P3K'], ['APAR', 'APAR']].concat(groups.map(g => [g.key, g.name])));
+  if (wantKat) {
+    const o = [...$('kat').options].find(o => String(o.value).toLowerCase() === wantKat);
+    if (o) { $('kat').value = o.value; layout(); wantKat = ''; } else if (ready.b) wantKat = '';
+  }
+  $('katList').innerHTML = groups.filter(g => !FIXED.some(f => catKey(f) === g.key)).map(g => `<option value="${esc(g.name)}">`).join('');
 
   const f = $('fKat').value, q = $('q').value.trim().toLowerCase();
-  const list = all.filter(x => (f === 'all' || (f === 'Lainnya' ? x.c === 'barang' && !FIXED.includes(x.kat) : x.kat === f))
+  const list = all.filter(x => (f === 'all' || (f === 'P3K' ? x.c === 'p3k' : f === 'APAR' ? x.c === 'apar' : x.c === 'barang' && catKey(x.kat) === f))
     && (!q || ((x.i.name || x.i.kode || '') + ' ' + x.i.lokasi + ' ' + x.kat).toLowerCase().includes(q)));
   const ctl = (x, a, t) => `<button data-a="${a}" data-c="${x.c}" data-id="${x.i.id}" aria-label="${t}" class="h-7 w-7 rounded-full text-slate-600 hover:bg-white hover:shadow-sm">${a === 'inc' ? '+' : '−'}</button>`;
   $('rows').innerHTML = list.length ? list.map(x => {
@@ -566,8 +648,7 @@ $('rows').onclick = e => {
   else {
     $('f').reset();
     $('id').value = it.id; $('eKind').value = c;
-    $('kat').value = c === 'p3k' ? 'P3K' : c === 'apar' ? 'APAR' : (FIXED.includes(it.kategori) ? it.kategori : 'Custom');
-    if (c === 'barang' && $('kat').value === 'Custom') $('katCustom').value = it.kategori || '';
+    $('kat').value = c === 'p3k' ? 'P3K' : c === 'apar' ? 'APAR' : canonCat(it.kategori);
     $('kat').disabled = true; layout();
     $('nama').value = it.name || it.kode || ''; $('lokasi').value = it.lokasi || ''; $('exp').value = it.exp || '';
     if (c === 'apar') { $('jenis').value = it.jenis; $('berat').value = it.berat; $('tekanan').value = it.tekanan; $('insp').value = it.insp || ''; }
@@ -579,10 +660,6 @@ $('rows').onclick = e => {
   }
 };
 
-// Kategori awal dari alamat, contoh Tambah.html?jenis=apar
-const j = (new URLSearchParams(location.search).get('jenis') || '').toLowerCase();
-const start0 = { p3k: 'P3K', apar: 'APAR', baju: 'Baju', sepatu: 'Sepatu', custom: 'Custom' }[j];
-if (start0) $('kat').value = start0;
 layout(); render();
 
 }
@@ -590,7 +667,7 @@ layout(); render();
 
 /* =====================================================================
    5. PENJALAN HALAMAN
-   
+   Setiap halaman HTML memiliki atribut <body data-page="...">.
    ===================================================================== */
 function start(DB) {
   const pages = { login: initLogin, dashboard: initDashboard, data: initData, tambah: initTambah };
