@@ -18,6 +18,14 @@ const FIREBASE_CONFIG = {
   measurementId: "G-JMS1KTR7DG"
 };
 
+// Halaman yang WAJIB login (tamu diarahkan ke Login.html). Halaman lain boleh dilihat tamu (hanya baca).
+//   Tamu hanya lihat Dashboard :  ['tambah', 'data']
+//   Tamu hanya lihat Data      :  ['tambah', 'dashboard']
+//   Tamu lihat Dashboard+Data  :  ['tambah']
+const WAJIB_LOGIN = ['tambah'];
+// Halaman awal untuk tamu dan tujuan setelah Keluar
+const HALAMAN_TAMU = WAJIB_LOGIN.includes('dashboard') ? 'Data.html' : 'Dashboard.html';
+
 /* =====================================================================
    2. FUNGSI BANTU DAN ATURAN STATUS
    ===================================================================== */
@@ -145,7 +153,7 @@ async function main() {
     DB.me = { uid: c.user.uid, email: c.user.email };
     return DB.me;
   };
-  DB.logout = async () => { await signOut(auth); location.href = 'Login.html'; };
+  DB.logout = async () => { await signOut(auth); location.href = HALAMAN_TAMU; };
   DB.resetPassword = email => sendPasswordResetEmail(auth, email.trim());
 
   // ---- Data (tambah, ubah, kurangi, hapus) ----
@@ -167,11 +175,21 @@ async function main() {
     }
   };
 
-  // ---- Penjaga halaman: tanpa login tidak bisa membuka halaman ----
+  // ---- Penjaga halaman (atur lewat WAJIB_LOGIN di bagian atas file) ----
   if (!isPublic) {
-    if (!DB.me) { location.replace('Login.html'); return; }
-    const u = document.getElementById('userName'); if (u) u.textContent = DB.me.email;
-    const b = document.getElementById('logoutBtn'); if (b) b.onclick = DB.logout;
+    if (WAJIB_LOGIN.includes(document.body.dataset.page) && !DB.me) { location.replace('Login.html'); return; }
+    const u = document.getElementById('userName'), b = document.getElementById('logoutBtn');
+    if (DB.me) {
+      if (u) u.textContent = DB.me.email;
+      if (b) b.onclick = DB.logout;
+    } else {
+      // Tampilan tamu: tombol Keluar menjadi Masuk, menu halaman yang tertutup disembunyikan
+      if (u) u.style.display = 'none';
+      if (b) { b.textContent = 'Masuk'; b.onclick = () => { location.href = 'Login.html'; }; }
+      const FILE = { tambah: 'Tambah.html', data: 'Data.html', dashboard: 'Dashboard.html' };
+      WAJIB_LOGIN.forEach(p => document.querySelectorAll('nav a[href="' + FILE[p] + '"]').forEach(a => { a.style.display = 'none'; }));
+      document.querySelectorAll('header a[href="Dashboard.html"]').forEach(a => { a.href = HALAMAN_TAMU; });   // logo mengarah ke halaman tamu
+    }
     const g = document.getElementById('guardHide'); if (g) g.remove();
   }
   start(DB);
@@ -219,7 +237,7 @@ function breakdown(title,href,sts){
   const seg=(k,col)=>c[k]?`<div class="${col}" style="width:${c[k]/t*100}%"></div>`:'';
   const row=(col,l,n)=>`<div class="flex items-center justify-between text-sm"><span class="flex items-center gap-2 text-slate-600"><span class="h-2.5 w-2.5 rounded-full ${col}"></span>${l}</span><b>${n}</b></div>`;
   return `<div class="card p-5">
-    <div class="flex items-center justify-between mb-4"><h2 class="font-bold text-navy-900">${esc(title)}</h2><a href="${href}" class="text-sm font-semibold text-pln hover:underline">Kelola</a></div>
+    <div class="flex items-center justify-between mb-4"><h2 class="font-bold text-navy-900">${esc(title)}</h2>${DB.me?`<a href="${href}" class="text-sm font-semibold text-pln hover:underline">Kelola</a>`:''}</div>
     <div class="flex h-3 rounded-full overflow-hidden bg-slate-100 mb-4">${seg('ok','bg-emerald-500')}${seg('warn','bg-amber-400')}${seg('bad','bg-red-500')}</div>
     <div class="space-y-2">${row('bg-emerald-500','Aman',c.ok)}${row('bg-amber-400','Perlu segera ditangani',c.warn)}${row('bg-red-500','Mendesak',c.bad)}</div></div>`;
 }
@@ -231,7 +249,7 @@ function render(){
   const sa=apar.map(i=>({t:'APAR',href:'Data.html',n:i.kode,l:i.lokasi,s:aparStatus(i),exp:i.exp}));
   const gr=groups.map(g=>({g,rows:g.items.map(i=>({t:g.name,href:'Data.html',n:i.name+(i.ukuran?' ('+i.ukuran+')':''),l:i.lokasi,s:p3kStatus(i),exp:i.exp}))}));
   const all=sp.concat(sa,...gr.map(x=>x.rows)),bad=all.filter(x=>x.s[1]!=='ok');
-  $('demoBox').classList.toggle('hidden',!(got.p&&got.a&&got.b)||all.length>0);
+  $('demoBox').classList.toggle('hidden',!DB.me||!(got.p&&got.a&&got.b)||all.length>0);
 
   const card=(l,v,ic,top,bg)=>`<div class="card p-4 border-t-4 ${top}"><div class="flex items-center justify-between"><div class="text-sm text-slate-500">${esc(l)}</div><div class="rounded-xl p-2 ${bg}">${svg(ic)}</div></div><div class="mt-2 text-3xl font-extrabold text-navy-900">${v}</div></div>`;
   const soon=all.filter(x=>x.exp&&daysLeft(x.exp)>=0&&daysLeft(x.exp)<=30).length;
@@ -260,7 +278,7 @@ function render(){
 
   bad.sort((a,b)=>(a.s[1]==='bad'?0:1)-(b.s[1]==='bad'?0:1));
   $('alertCount').textContent=bad.length+' temuan';
-  $('alerts').innerHTML=bad.length?bad.map(x=>`<tr class="hover:bg-slate-50/70"><td class="px-5 py-2.5"><a href="${x.href}" class="font-semibold text-pln hover:underline">${esc(x.t)}</a></td><td class="px-3 py-2.5 font-medium">${esc(x.n)}</td><td class="px-3 py-2.5 text-slate-600">${esc(x.l)}</td><td class="px-3 py-2.5">${pill(x.s)}</td></tr>`).join('')
+  $('alerts').innerHTML=bad.length?bad.map(x=>`<tr class="hover:bg-slate-50/70"><td class="px-5 py-2.5">${DB.me||!WAJIB_LOGIN.includes('data')?`<a href="${x.href}" class="font-semibold text-pln hover:underline">${esc(x.t)}</a>`:`<span class="font-semibold">${esc(x.t)}</span>`}</td><td class="px-3 py-2.5 font-medium">${esc(x.n)}</td><td class="px-3 py-2.5 text-slate-600">${esc(x.l)}</td><td class="px-3 py-2.5">${pill(x.s)}</td></tr>`).join('')
     :`<tr><td colspan="4" class="px-5 py-10 text-center text-slate-500">${all.length?'Semua item dalam kondisi aman.':'Belum ada data untuk diperiksa.'}</td></tr>`;
 }
 
@@ -352,6 +370,7 @@ function renderCharts() {
       scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } } } });
 }
 
+if(!DB.me){const bk=$('exp').closest('section');if(bk)bk.classList.add('hidden');}   // tamu: hanya melihat
 const fail=e=>alert(DB.err(e));
 DB.watch('p3k',l=>{p3k=l;got.p=1;render();renderCharts();});
 DB.watch('apar',l=>{apar=l;got.a=1;render();renderCharts();});
@@ -414,6 +433,7 @@ function initData(DB) {
 const byNew = (a, b) => (b.created || 0) - (a.created || 0);
 let p3k = [], apar = [], brg = [], loaded = { p: false, a: false, b: false };
 $('todayTxt').textContent = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+if (!DB.me) document.querySelectorAll('main a[href="Tambah.html"]').forEach(a => a.classList.add('hidden'));   // tamu: hanya melihat
 DB.watch('p3k', l => { p3k = l.sort(byNew); loaded.p = true; render(); });
 DB.watch('apar', l => { apar = l.sort(byNew); loaded.a = true; render(); });
 DB.watch('barang', l => { brg = l.sort(byNew); loaded.b = true; render(); });

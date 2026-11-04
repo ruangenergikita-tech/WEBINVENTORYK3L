@@ -1,6 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Hanya email di daftar ini yang boleh menambah, mengubah, dan menghapus data.
     function diizinkan() {
       return request.auth != null
         && request.auth.token.email in [
@@ -8,8 +10,10 @@ service cloud.firestore {
           'k3lplnup2d@gmail.com'
         ];
     }
-    match /p3k/{id}    { allow read, write: if diizinkan(); }
-    match /apar/{id}   { allow read, write: if diizinkan(); }
-    match /barang/{id} { allow read, write: if diizinkan(); }
+
+    // Siapa saja boleh MELIHAT data. Mengubah data hanya untuk akun yang diizinkan.
+    match /p3k/{id}    { allow read: if true; allow write: if diizinkan(); }
+    match /apar/{id}   { allow read: if true; allow write: if diizinkan(); }
+    match /barang/{id} { allow read: if true; allow write: if diizinkan(); }
   }
 }
