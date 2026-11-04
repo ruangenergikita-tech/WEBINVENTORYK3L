@@ -25,7 +25,7 @@ tailwind.config = { theme: { extend: {
 .hero{background:radial-gradient(900px 380px at 88% 0%,var(--glow),transparent 60%),repeating-linear-gradient(135deg,rgba(255,255,255,.035) 0 2px,transparent 2px 24px),linear-gradient(120deg,#072B47,#0A4673 65%,#0D5C95)}
 .card{background:#fff;border-radius:1rem;box-shadow:0 0 0 1px rgba(226,232,240,.8),0 1px 2px rgba(7,43,71,.06),0 14px 28px -16px rgba(7,43,71,.22)}
 </style>
-<style id="guardHide">body{visibility:hidden}</style>
+<style>body:not(.siap) #logoutBtn,body:not(.siap) #userName,body:not(.siap) nav a[href="Tambah.html"]{visibility:hidden}</style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body data-page="dashboard" class="bg-slate-100 font-sans text-slate-800 antialiased min-h-screen flex flex-col">
@@ -149,6 +149,6 @@ tailwind.config = { theme: { extend: {
   <span>Data tersimpan di Firebase dan sinkron di semua perangkat.</span>
 </footer>
 
-<script type="module" src="app.js?v=20261103"></script>
+<script type="module" src="app.js?v=20261106"></script>
 </body>
 </html>

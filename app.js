@@ -191,6 +191,7 @@ async function main() {
       document.querySelectorAll('header a[href="Dashboard.html"]').forEach(a => { a.href = HALAMAN_TAMU; });   // logo mengarah ke halaman tamu
     }
     const g = document.getElementById('guardHide'); if (g) g.remove();
+    document.body.classList.add('siap');   // tombol akun dan menu Tambah baru ditampilkan setelah status login diketahui
   }
   start(DB);
 }

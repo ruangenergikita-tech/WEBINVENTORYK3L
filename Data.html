@@ -31,7 +31,7 @@ tailwind.config = { theme: { extend: {
   .card{box-shadow:none !important;border:1px solid #e2e8f0}
 }
 </style>
-<style id="guardHide">body{visibility:hidden}</style>
+<style>body:not(.siap) #logoutBtn,body:not(.siap) #userName,body:not(.siap) nav a[href="Tambah.html"]{visibility:hidden}</style>
 </head>
 <body data-page="data" class="bg-slate-100 font-sans text-slate-800 antialiased min-h-screen flex flex-col">
 
@@ -153,6 +153,6 @@ tailwind.config = { theme: { extend: {
   <span>Data tersimpan di Firebase dan sinkron di semua perangkat.</span>
 </footer>
 
-<script type="module" src="app.js?v=20261103"></script>
+<script type="module" src="app.js?v=20261106"></script>
 </body>
 </html>
